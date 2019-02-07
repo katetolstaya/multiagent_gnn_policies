@@ -17,6 +17,7 @@ from ounoise import OUNoise
 from param_noise import AdaptiveParamNoiseSpec, ddpg_distance_metric
 from replay_memory import ReplayMemory, Transition
 
+
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
 parser.add_argument('--algo', default='NAF',
                     help='algorithm to use: DDPG | NAF')
@@ -74,8 +75,11 @@ rewards = []
 total_numsteps = 0
 updates = 0
 
+n_agents = 30
+action = np.zeros((n_agents, env.action_space.shape[0]))
+
 for i_episode in range(args.num_episodes):
-    state = torch.Tensor([env.reset()])
+    state = env.reset() # TODO
 
     if args.ou_noise: 
         ounoise.scale = (args.noise_scale - args.final_noise_scale) * max(0, args.exploration_end -
@@ -87,17 +91,24 @@ for i_episode in range(args.num_episodes):
 
     episode_reward = 0
     while True:
-        action = agent.select_action(state, ounoise, param_noise)
-        next_state, reward, done, _ = env.step(action.numpy()[0])
+
+        for n in range(n_agents):
+            arr_agent_state = state[n,:].flatten()
+            agent_state = torch.Tensor([state[n,:].flatten()])
+            agent_action = agent.select_action(agent_state, ounoise, param_noise)
+            action[n, :] = agent_action.numpy()
+
+        next_state, reward, done, _ = env.step(action)
         total_numsteps += 1
         episode_reward += reward
-
-        action = torch.Tensor(action)
         mask = torch.Tensor([not done])
-        next_state = torch.Tensor([next_state])
         reward = torch.Tensor([reward])
 
-        memory.push(state, action, mask, next_state, reward)
+        for n in range(n_agents):
+            agent_action = torch.Tensor([action[n,:].flatten()])
+            agent_next_state = torch.Tensor([next_state[n,:].flatten()])
+            agent_state = torch.Tensor([state[n,:].flatten()])
+            memory.push(agent_state, agent_action, mask, agent_next_state, reward)
 
         state = next_state
 
@@ -129,15 +140,17 @@ for i_episode in range(args.num_episodes):
 
     rewards.append(episode_reward)
     if i_episode % 10 == 0:
-        state = torch.Tensor([env.reset()])
+        state = env.reset() #torch.Tensor([env.reset()]) # TODO
         episode_reward = 0
         while True:
-            action = agent.select_action(state)
+            for n in range(n_agents):
+                agent_state = torch.Tensor([state[n,:].flatten()])
+                agent_action = agent.select_action(agent_state, ounoise, param_noise)
+                action[n, :] = agent_action.numpy()
+            #action = agent.select_action(state)
 
-            next_state, reward, done, _ = env.step(action.numpy()[0])
+            next_state, reward, done, _ = env.step(action) # TODO
             episode_reward += reward
-
-            next_state = torch.Tensor([next_state])
 
             state = next_state
             if done:
