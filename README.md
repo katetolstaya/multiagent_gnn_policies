@@ -18,10 +18,10 @@ Use the default hyperparameters.
 #### For NAF:
 
 ```
-python main.py --algo NAF --env-name Flocking-v0
+python main.py --algo NAF
 ```
 #### For DDPG
 
 ```
-python main.py --algo DDPG --env-name Flocking-v0
+python main.py --algo DDPG
 ```
