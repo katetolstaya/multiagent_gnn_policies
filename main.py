@@ -18,16 +18,9 @@ from param_noise import AdaptiveParamNoiseSpec, ddpg_distance_metric
 from replay_memory import ReplayMemory, Transition
 
 
-####################
-# Change the number of agents here and in the flocking.py file
-n_agents = 30
-####################
-
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
 parser.add_argument('--algo', default='NAF',
                     help='algorithm to use: DDPG | NAF')
-parser.add_argument('--env-name', default="HalfCheetah-v2",
-                    help='name of the environment to run')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
                     help='discount factor for reward (default: 0.99)')
 parser.add_argument('--tau', type=float, default=0.001, metavar='G',
@@ -56,8 +49,7 @@ parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
                     help='size of replay buffer (default: 1000000)')
 args = parser.parse_args()
 
-env = NormalizedActions(gym.make(args.env_name))
-
+env = NormalizedActions(gym.make('Flocking-v0'))
 writer = SummaryWriter()
 
 env.seed(args.seed)
@@ -79,6 +71,9 @@ param_noise = AdaptiveParamNoiseSpec(initial_stddev=0.05,
 rewards = []
 total_numsteps = 0
 updates = 0
+
+state = env.reset()
+n_agents = state.shape[0]
 
 action = np.zeros((n_agents, env.action_space.shape[0]))
 
