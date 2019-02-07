@@ -18,6 +18,11 @@ from param_noise import AdaptiveParamNoiseSpec, ddpg_distance_metric
 from replay_memory import ReplayMemory, Transition
 
 
+####################
+# Change the number of agents here and in the flocking.py file
+n_agents = 30
+####################
+
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
 parser.add_argument('--algo', default='NAF',
                     help='algorithm to use: DDPG | NAF')
@@ -75,7 +80,6 @@ rewards = []
 total_numsteps = 0
 updates = 0
 
-n_agents = 30
 action = np.zeros((n_agents, env.action_space.shape[0]))
 
 for i_episode in range(args.num_episodes):
