@@ -5,6 +5,13 @@ Completely based on [Ilya Kostrikov's Implementation](https://github.com/ikostri
 
 Extended to run on a [multi-agent flocking environment](https://github.com/katetolstaya/multiagent_ddpg)
 
+### Dependencies
+- PyTorch
+- TensorboardX
+- OpenAI Gym
+- [Multi-agent flocking Gym environment](https://github.com/katetolstaya/multiagent_ddpg)
+- TQDM
+
 ### Run
 Use the default hyperparameters.
 
