@@ -9,7 +9,7 @@ Extended to run on a [multi-agent flocking environment](https://github.com/katet
 - PyTorch
 - TensorboardX
 - OpenAI Gym
-- [Multi-agent flocking Gym environment](https://github.com/katetolstaya/multiagent_ddpg)
+- [Multi-agent flocking Gym environment](https://github.com/katetolstaya/gym_flock.git)
 - TQDM
 
 ### Run
