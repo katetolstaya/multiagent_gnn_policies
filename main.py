@@ -51,6 +51,8 @@ parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
                     help='size of replay buffer (default: 1000000)')
 args = parser.parse_args()
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 env = NormalizedActions(gym.make(args.env_name))
 writer = SummaryWriter()
 
@@ -59,16 +61,16 @@ torch.manual_seed(args.seed)
 np.random.seed(args.seed)
 if args.algo == "NAF":
     agent = NAF(args.gamma, args.tau, args.hidden_size,
-                      env.observation_space.shape[0], env.action_space)
+                      env.observation_space.shape[0], env.action_space, device)
 else:
     agent = DDPG(args.gamma, args.tau, args.hidden_size,
-                      env.observation_space.shape[0], env.action_space)
+                      env.observation_space.shape[0], env.action_space, device)
 
 memory = ReplayMemory(args.replay_size)
 
 ounoise = OUNoise(env.action_space.shape[0]) if args.ou_noise else None
 param_noise = AdaptiveParamNoiseSpec(initial_stddev=0.05, 
-    desired_action_stddev=args.noise_scale, adaptation_coefficient=1.05) if args.param_noise else None
+    desired_action_stddev=args.noise_scale, adaptation_coefficient=1.05, device=device) if args.param_noise else None
 
 rewards = []
 total_numsteps = 0
@@ -95,9 +97,9 @@ for i_episode in range(args.num_episodes):
 
         for n in range(n_agents):
             arr_agent_state = state[n,:].flatten()
-            agent_state = torch.Tensor([state[n,:].flatten()])
+            agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
             agent_action = agent.select_action(agent_state, ounoise, param_noise)
-            action[n, :] = agent_action.numpy()
+            action[n, :] = agent_action.cpu().numpy()
 
         next_state, reward, done, _ = env.step(action)
         total_numsteps += 1
@@ -106,9 +108,9 @@ for i_episode in range(args.num_episodes):
         reward = torch.Tensor([reward])
 
         for n in range(n_agents):
-            agent_action = torch.Tensor([action[n,:].flatten()])
-            agent_next_state = torch.Tensor([next_state[n,:].flatten()])
-            agent_state = torch.Tensor([state[n,:].flatten()])
+            agent_action = torch.Tensor([action[n,:].flatten()]).to(device)
+            agent_next_state = torch.Tensor([next_state[n,:].flatten()]).to(device)
+            agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
             memory.push(agent_state, agent_action, mask, agent_next_state, reward)
 
         state = next_state
@@ -132,11 +134,11 @@ for i_episode in range(args.num_episodes):
     # Update param_noise based on distance metric
     if args.param_noise:
         episode_transitions = memory.memory[memory.position-t:memory.position]
-        states = torch.cat([transition[0] for transition in episode_transitions], 0)
+        states = torch.cat([transition[0] for transition in episode_transitions], 0).to(device)
         unperturbed_actions = agent.select_action(states, None, None)
         perturbed_actions = torch.cat([transition[1] for transition in episode_transitions], 0)
 
-        ddpg_dist = ddpg_distance_metric(perturbed_actions.numpy(), unperturbed_actions.numpy())
+        ddpg_dist = ddpg_distance_metric(perturbed_actions.cpu().numpy(), unperturbed_actions.cpu().numpy())
         param_noise.adapt(ddpg_dist)
 
     rewards.append(episode_reward)
@@ -145,9 +147,9 @@ for i_episode in range(args.num_episodes):
         episode_reward = 0
         while True:
             for n in range(n_agents):
-                agent_state = torch.Tensor([state[n,:].flatten()])
+                agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
                 agent_action = agent.select_action(agent_state, ounoise, param_noise)
-                action[n, :] = agent_action.numpy()
+                action[n, :] = agent_action.cpu().numpy()
             #action = agent.select_action(state)
 
             next_state, reward, done, _ = env.step(action) # TODO
