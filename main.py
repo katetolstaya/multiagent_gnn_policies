@@ -19,6 +19,8 @@ from replay_memory import ReplayMemory, Transition
 
 
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
+parser.add_argument('--env-name', default="LQR-v0",
+                    help='name of the environment to run')
 parser.add_argument('--algo', default='NAF',
                     help='algorithm to use: DDPG | NAF')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
@@ -49,7 +51,7 @@ parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
                     help='size of replay buffer (default: 1000000)')
 args = parser.parse_args()
 
-env = NormalizedActions(gym.make('Flocking-v0'))
+env = NormalizedActions(gym.make(args.env_name))
 writer = SummaryWriter()
 
 env.seed(args.seed)
