@@ -18,10 +18,10 @@ Use the default hyperparameters.
 #### For NAF:
 
 ```
-python main.py --algo NAF
+python main.py --algo NAF --LQR-v0
 ```
 #### For DDPG
 
 ```
-python main.py --algo DDPG
+python main.py --algo DDPG --Flocking-v0
 ```
