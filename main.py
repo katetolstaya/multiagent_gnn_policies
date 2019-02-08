@@ -112,6 +112,7 @@ for i_episode in range(args.num_episodes):
             agent_next_state = torch.Tensor([next_state[n,:].flatten()]).to(device)
             agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
             memory.push(agent_state, agent_action, mask, agent_next_state, reward)
+            #break # 
 
         state = next_state
 
