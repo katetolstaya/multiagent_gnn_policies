@@ -83,6 +83,9 @@ n_agents = state.shape[0]
 action = np.zeros((n_agents, env.action_space.shape[0]))
 
 for i_episode in range(args.num_episodes):
+
+    agent.save_model(env_name)
+
     state = env.reset() # TODO
 
     if args.ou_noise: 
@@ -166,4 +169,5 @@ for i_episode in range(args.num_episodes):
         rewards.append(episode_reward)
         print("Episode: {}, total numsteps: {}, reward: {}, average reward: {}".format(i_episode, total_numsteps, rewards[-1], np.mean(rewards[-10:])))
     
+
 env.close()
