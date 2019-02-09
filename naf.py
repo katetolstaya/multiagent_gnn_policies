@@ -123,6 +123,7 @@ class NAF:
 
         print(state_batch)
         print(action_batch)
+        print(self.model)
         _, state_action_values, _ = self.model((state_batch, action_batch))
 
         loss = MSELoss(state_action_values, expected_state_action_values)
