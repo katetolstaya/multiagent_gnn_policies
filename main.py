@@ -8,7 +8,7 @@ from tensorboardX import SummaryWriter
 import gym
 import numpy as np
 from gym import wrappers
-import gym-flock
+import gym_flock
 
 import torch
 from ddpg import DDPG
