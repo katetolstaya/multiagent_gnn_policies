@@ -121,6 +121,8 @@ class NAF:
         mask_batch = mask_batch.unsqueeze(1) #.to(self.device)
         expected_state_action_values = reward_batch + (self.gamma * mask_batch + next_state_values)
 
+        print(state_batch)
+        print(action_batch)
         _, state_action_values, _ = self.model((state_batch, action_batch))
 
         loss = MSELoss(state_action_values, expected_state_action_values)
