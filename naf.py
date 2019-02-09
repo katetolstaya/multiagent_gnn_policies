@@ -100,7 +100,7 @@ class NAF:
 
     def select_action(self, state, action_noise=None, param_noise=None):
         self.model.eval()
-        mu, _, _ = self.model((Variable(state), None))
+        mu, _, _ = self.model((Variable(state).to(self.device), None))
         self.model.train()
         mu = mu.data
         if action_noise is not None:

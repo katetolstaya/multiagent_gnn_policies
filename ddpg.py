@@ -102,7 +102,7 @@ class Critic(nn.Module):
         return V
 
 class DDPG(object):
-    def __init__(self, gamma, tau, hidden_size, num_inputs, action_space,device):
+    def __init__(self, gamma, tau, hidden_size, num_inputs, action_space, device):
         self.device = device
         self.num_inputs = num_inputs
         self.action_space = action_space
