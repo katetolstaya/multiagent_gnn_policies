@@ -147,7 +147,6 @@ for i_episode in range(args.num_episodes):
 
     rewards.append(episode_reward)
     if i_episode % 10 == 0:
-        agent.save_model(args.env_name, suffix=str(i_episode))
         state = env.reset() #torch.Tensor([env.reset()]) # TODO
         episode_reward = 0
         while True:
@@ -168,6 +167,7 @@ for i_episode in range(args.num_episodes):
 
         rewards.append(episode_reward)
         print("Episode: {}, total numsteps: {}, reward: {}, average reward: {}".format(i_episode, total_numsteps, rewards[-1], np.mean(rewards[-10:])))
-    
+    if i_episode % 50 == 0:       
+        agent.save_model(args.env_name, suffix=str(i_episode))
 
 env.close()
