@@ -84,8 +84,6 @@ action = np.zeros((n_agents, env.action_space.shape[0]))
 
 for i_episode in range(args.num_episodes):
 
-    agent.save_model(env_name)
-
     state = env.reset() # TODO
 
     if args.ou_noise: 
@@ -133,6 +131,8 @@ for i_episode in range(args.num_episodes):
                 updates += 1
         if done:
             break
+
+    agent.save_model(args.env_name, suffix=str(i_episode))
 
     writer.add_scalar('reward/train', episode_reward, i_episode)
 
