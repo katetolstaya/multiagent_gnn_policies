@@ -52,7 +52,8 @@ parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
                     help='size of replay buffer (default: 1000000)')
 args = parser.parse_args()
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 env = NormalizedActions(gym.make(args.env_name))
 writer = SummaryWriter()
