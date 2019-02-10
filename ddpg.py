@@ -69,7 +69,7 @@ class Actor(nn.Module):
         x = self.linear2(x)
         x = self.ln2(x)
         x = F.relu(x)
-        mu = F.tanh(self.mu(x))
+        mu = torch.tanh(self.mu(x))
         return mu
 
 class Critic(nn.Module):
@@ -200,8 +200,8 @@ class DDPG(object):
     def load_model(self, actor_path, critic_path):
         print('Loading models from {} and {}'.format(actor_path, critic_path))
         if actor_path is not None:
-            self.actor.load_state_dict(torch.load(actor_path))
+            self.actor.load_state_dict(torch.load(actor_path, map_location='cpu'))
             self.actor = self.actor.to(self.device)
         if critic_path is not None: 
-            self.critic.load_state_dict(torch.load(critic_path))
+            self.critic.load_state_dict(torch.load(critic_path, map_location='cpu'))
             self.critic = self.critic.to(self.device)

@@ -58,11 +58,11 @@ class Policy(nn.Module):
     def forward(self, inputs):
         x, u = inputs
         x = self.bn0(x)
-        x = F.tanh(self.linear1(x))
-        x = F.tanh(self.linear2(x))
+        x = torch.tanh(self.linear1(x))
+        x = torch.tanh(self.linear2(x))
 
         V = self.V(x)
-        mu = F.tanh(self.mu(x))
+        mu = torch.tanh(self.mu(x))
 
         Q = None
         if u is not None:
@@ -121,16 +121,13 @@ class NAF:
         mask_batch = mask_batch.unsqueeze(1) #.to(self.device)
         expected_state_action_values = reward_batch + (self.gamma * mask_batch + next_state_values)
 
-        print(state_batch)
-        print(action_batch)
-        print(self.model)
         _, state_action_values, _ = self.model((state_batch, action_batch))
 
         loss = MSELoss(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm(self.model.parameters(), 1)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1)
         self.optimizer.step()
 
         soft_update(self.target_model, self.model, self.tau)
@@ -143,7 +140,7 @@ class NAF:
 
         if model_path is None:
             model_path = "models/naf_{}_{}".format(env_name, suffix) 
-        print('Saving model to {}'.format(actor_path))
+        print('Saving model to {}'.format(model_path))
         torch.save(self.model.state_dict(), model_path)
 
     def load_model(self, model_path):
