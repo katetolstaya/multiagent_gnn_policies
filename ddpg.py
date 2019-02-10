@@ -102,17 +102,18 @@ class Critic(nn.Module):
         return V
 
 class DDPG(object):
-    def __init__(self, gamma, tau, hidden_size, num_inputs, action_space):
+    def __init__(self, gamma, tau, hidden_size, num_inputs, action_space, device):
+        self.device = device
         self.num_inputs = num_inputs
         self.action_space = action_space
 
-        self.actor = Actor(hidden_size, self.num_inputs, self.action_space) 
-        self.actor_target = Actor(hidden_size, self.num_inputs, self.action_space) 
-        self.actor_perturbed = Actor(hidden_size, self.num_inputs, self.action_space) 
+        self.actor = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
+        self.actor_target = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
+        self.actor_perturbed = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.actor_optim = Adam(self.actor.parameters(), lr=1e-4)
 
-        self.critic = Critic(hidden_size, self.num_inputs, self.action_space) 
-        self.critic_target = Critic(hidden_size, self.num_inputs, self.action_space) 
+        self.critic = Critic(hidden_size, self.num_inputs, self.action_space).to(self.device)
+        self.critic_target = Critic(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
 
 
@@ -134,17 +135,17 @@ class DDPG(object):
         mu = mu.data
 
         if action_noise is not None:
-            mu += torch.Tensor(action_noise.noise()) 
+            mu += torch.Tensor(action_noise.noise()).to(self.device)
 
         return mu.clamp(-1, 1)
 
 
     def update_parameters(self, batch):
-        state_batch = Variable(torch.cat(batch.state)) 
-        action_batch = Variable(torch.cat(batch.action)) 
-        reward_batch = Variable(torch.cat(batch.reward)) 
-        mask_batch = Variable(torch.cat(batch.mask)) 
-        next_state_batch = Variable(torch.cat(batch.next_state)) 
+        state_batch = Variable(torch.cat(batch.state)).to(self.device)
+        action_batch = Variable(torch.cat(batch.action)).to(self.device)
+        reward_batch = Variable(torch.cat(batch.reward)).to(self.device)
+        mask_batch = Variable(torch.cat(batch.mask)).to(self.device)
+        next_state_batch = Variable(torch.cat(batch.next_state)).to(self.device)
         
         next_action_batch = self.actor_target(next_state_batch)
         next_state_action_values = self.critic_target(next_state_batch, next_action_batch)
@@ -200,7 +201,7 @@ class DDPG(object):
         print('Loading models from {} and {}'.format(actor_path, critic_path))
         if actor_path is not None:
             self.actor.load_state_dict(torch.load(actor_path))
-            self.actor = self.actor 
+            self.actor = self.actor.to(self.device)
         if critic_path is not None: 
             self.critic.load_state_dict(torch.load(critic_path))
-            self.critic = self.critic 
+            self.critic = self.critic.to(self.device)

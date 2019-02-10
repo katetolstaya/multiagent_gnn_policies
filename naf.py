@@ -84,13 +84,14 @@ class Policy(nn.Module):
 
 class NAF:
 
-    def __init__(self, gamma, tau, hidden_size, num_inputs, action_space):
+    def __init__(self, gamma, tau, hidden_size, num_inputs, action_space, device):
         self.action_space = action_space
         self.num_inputs = num_inputs
         
-        self.model = Policy(hidden_size, num_inputs, action_space)
-        self.target_model = Policy(hidden_size, num_inputs, action_space)
+        self.model = Policy(hidden_size, num_inputs, action_space).to(device)
+        self.target_model = Policy(hidden_size, num_inputs, action_space).to(device)
         self.optimizer = Adam(self.model.parameters(), lr=1e-3)
+        self.device = device
 
         self.gamma = gamma
         self.tau = tau
@@ -103,21 +104,21 @@ class NAF:
         self.model.train()
         mu = mu.data
         if action_noise is not None:
-            mu += torch.Tensor(action_noise.noise())
+            mu += torch.Tensor(action_noise.noise()).to(self.device)
 
         return mu.clamp(-1, 1)
 
     def update_parameters(self, batch):
-        state_batch = Variable(torch.cat(batch.state))
-        action_batch = Variable(torch.cat(batch.action))
-        reward_batch = Variable(torch.cat(batch.reward))
-        mask_batch = Variable(torch.cat(batch.mask))
-        next_state_batch = Variable(torch.cat(batch.next_state))
+        state_batch = Variable(torch.cat(batch.state)).to(self.device)
+        action_batch = Variable(torch.cat(batch.action)).to(self.device)
+        reward_batch = Variable(torch.cat(batch.reward)).to(self.device)
+        mask_batch = Variable(torch.cat(batch.mask)).to(self.device)
+        next_state_batch = Variable(torch.cat(batch.next_state)).to(self.device)
 
         _, _, next_state_values = self.target_model((next_state_batch, None))
 
-        reward_batch = reward_batch.unsqueeze(1) #
-        mask_batch = mask_batch.unsqueeze(1) #
+        reward_batch = reward_batch.unsqueeze(1) #.to(self.device)
+        mask_batch = mask_batch.unsqueeze(1) #.to(self.device)
         expected_state_action_values = reward_batch + (self.gamma * mask_batch + next_state_values)
 
         print(state_batch)
@@ -148,4 +149,4 @@ class NAF:
     def load_model(self, model_path):
         print('Loading model from {}'.format(model_path))
         self.model.load_state_dict(torch.load(model_path))
-        self.model = self.model
+        self.model = self.model.to(self.device)
