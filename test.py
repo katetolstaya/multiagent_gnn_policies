@@ -57,7 +57,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 env_name = 'Flocking-v0'
-suffix = 500
+suffix = 900
 actor_path = "models/ddpg_actor_{}_{}".format(env_name, suffix) 
 critic_path = "models/ddpg_critic_{}_{}".format(env_name, suffix) 
 
