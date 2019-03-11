@@ -5,6 +5,8 @@ import torch.nn as nn
 from torch.optim import Adam
 from torch.autograd import Variable
 import torch.nn.functional as F
+from torch.nn import Parameter
+import math
 
 def soft_update(target, source, tau):
     for target_param, param in zip(target.parameters(), source.parameters()):
@@ -14,50 +16,47 @@ def hard_update(target, source):
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(param.data)
 
-"""
-From: https://github.com/pytorch/pytorch/issues/1959
-There's an official LayerNorm implementation in pytorch now, but it hasn't been included in 
-pip version yet. This is a temporary version
-This slows down training by a bit
-"""
-# class LayerNorm(nn.Module):
-#     def __init__(self, num_features, eps=1e-5, affine=True):
-#         super(LayerNorm, self).__init__()
-#         self.num_features = num_features
-#         self.affine = affine
-#         self.eps = eps
+class TiedLinear(nn.Module):
+    def __init__(self, in_features, out_features, bias=True):
+        super(TiedLinear, self).__init__()
+        self.n_agents = 30
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = Parameter(torch.Tensor(out_features, in_features))
+        if bias:
+            self.bias = Parameter(torch.Tensor(out_features))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
 
-#         if self.affine:
-#             self.gamma = nn.Parameter(torch.Tensor(num_features).uniform_())
-#             self.beta = nn.Parameter(torch.zeros(num_features))
+    def reset_parameters(self):
+        stdv = 1. / math.sqrt(self.weight.size(0))
+        self.weight.data.uniform_(-stdv, stdv)
+        if self.bias is not None:
+            self.bias.data.uniform_(-stdv, stdv)
 
-#     def forward(self, x):
-#         shape = [-1] + [1] * (x.dim() - 1)
-#         mean = x.view(x.size(0), -1).mean(1).view(*shape)
-#         std = x.view(x.size(0), -1).std(1).view(*shape)
-
-#         y = (x - mean) / (std + self.eps)
-#         if self.affine:
-#             shape = [1, -1] + [1] * (x.dim() - 2)
-#             y = self.gamma.view(*shape) * y + self.beta.view(*shape)
-#         return y
-
-# nn.LayerNorm = LayerNorm
+    def forward(self, input):
+        repeated_weight = self.weight.repeat(self.n_agents, self.n_agents) #.flatten()
+        repeated_bias = self.bias.repeat(1, self.n_agents) #.flatten()
+        return F.linear(input, repeated_weight, repeated_bias)
 
 
 class Actor(nn.Module):
     def __init__(self, hidden_size, num_inputs, action_space):
         super(Actor, self).__init__()
+
         self.action_space = action_space
-        num_outputs = action_space.shape[0]
+        self.n_agents = 30
+        self.num_outputs = 2 #int(action_space.shape[0]/self.n_agents)
+        self.num_inputs = 12 #int(num_inputs/self.n_agents)
 
-        self.linear1 = nn.Linear(num_inputs, hidden_size)
-        self.ln1 = nn.LayerNorm(hidden_size)
+        self.linear1 = TiedLinear(self.num_inputs, hidden_size)
+        self.ln1 = nn.LayerNorm(hidden_size*self.n_agents)
 
-        self.linear2 = nn.Linear(hidden_size, hidden_size)
-        self.ln2 = nn.LayerNorm(hidden_size)
+        self.linear2 = TiedLinear(hidden_size, hidden_size)
+        self.ln2 = nn.LayerNorm(hidden_size*self.n_agents)
 
-        self.mu = nn.Linear(hidden_size, num_outputs)
+        self.mu = TiedLinear(hidden_size, self.num_outputs)
         self.mu.weight.data.mul_(0.1)
         self.mu.bias.data.mul_(0.1)
 
@@ -69,37 +68,64 @@ class Actor(nn.Module):
         x = self.linear2(x)
         x = self.ln2(x)
         x = F.relu(x)
-        mu = torch.tanh(self.mu(x))
+        mu = F.tanh(self.mu(x))
         return mu
+        # mu = []
+        # for i in range(self.n_agents):
+        #     x = inputs[:,i*self.num_inputs:(i+1)*self.num_inputs]
+        #     x = self.linear1(x)
+        #     x = self.ln1(x)
+        #     x = F.relu(x)
+        #     x = self.linear2(x)
+        #     x = self.ln2(x)
+        #     x = F.relu(x)
+        #     mu.append(torch.tanh(self.mu(x)))
+        # return torch.cat(mu,1)
 
 class Critic(nn.Module):
     def __init__(self, hidden_size, num_inputs, action_space):
         super(Critic, self).__init__()
+
         self.action_space = action_space
-        num_outputs = action_space.shape[0]
+        self.n_agents = 30
+        self.num_outputs = 2 #int(action_space.shape[0]/self.n_agents)
+        self.num_inputs = 12 #int(num_inputs/self.n_agents)
 
-        self.linear1 = nn.Linear(num_inputs, hidden_size)
-        self.ln1 = nn.LayerNorm(hidden_size)
+        self.linear1 = TiedLinear(self.num_inputs + self.num_outputs, hidden_size)
+        self.ln1 = nn.LayerNorm(hidden_size*self.n_agents)
 
-        self.linear2 = nn.Linear(hidden_size+num_outputs, hidden_size)
-        self.ln2 = nn.LayerNorm(hidden_size)
+        self.linear2 = TiedLinear(hidden_size, hidden_size)
+        self.ln2 = nn.LayerNorm(hidden_size*self.n_agents)
 
-        self.V = nn.Linear(hidden_size, 1)
+        self.V = TiedLinear(hidden_size, 1)
         self.V.weight.data.mul_(0.1)
         self.V.bias.data.mul_(0.1)
 
     def forward(self, inputs, actions):
-        x = inputs
+        x = torch.cat((inputs, actions), 1)
         x = self.linear1(x)
         x = self.ln1(x)
         x = F.relu(x)
-
-        x = torch.cat((x, actions), 1)
         x = self.linear2(x)
         x = self.ln2(x)
         x = F.relu(x)
         V = self.V(x)
         return V
+
+        # V = torch.zeros([1], dtype=torch.float32)
+        # V = []
+        # for i in range(self.n_agents):
+        #     state = inputs[:,(i*self.num_inputs):((i+1)*self.num_inputs)]
+        #     action = actions[:,(i*self.num_outputs):((i+1)*self.num_outputs)]
+        #     x = torch.cat((state,action),1)
+        #     x = self.linear1(x)
+        #     x = self.ln1(x)
+        #     x = F.relu(x)
+        #     x = self.linear2(x)
+        #     x = self.ln2(x)
+        #     x = F.relu(x)
+        #     V.append(self.V(x)) 
+        # return torch.sum(torch.cat(V,1),1) # TODO can use other operations like max or min
 
 class DDPG(object):
     def __init__(self, gamma, tau, hidden_size, num_inputs, action_space, device):
