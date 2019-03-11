@@ -20,7 +20,7 @@ from replay_memory import ReplayMemory, Transition
 
 
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
-parser.add_argument('--env-name', default="LQR-v0",
+parser.add_argument('--env-name', default="Flocking-v0",
                     help='name of the environment to run')
 parser.add_argument('--algo', default='NAF',
                     help='algorithm to use: DDPG | NAF')
@@ -104,18 +104,23 @@ for i_episode in range(args.num_episodes):
             agent_action = agent.select_action(agent_state, ounoise, param_noise)
             action[n, :] = agent_action.cpu().numpy()
 
-        next_state, reward, done, _ = env.step(action)
+        (amax, next_state), reward, done, _ = env.step(action)
         total_numsteps += 1
         episode_reward += reward
         mask = torch.Tensor([not done])
         reward = torch.Tensor([reward])
 
-        for n in range(n_agents):
-            agent_action = torch.Tensor([action[n,:].flatten()]).to(device)
-            agent_next_state = torch.Tensor([next_state[n,:].flatten()]).to(device)
-            agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
-            memory.push(agent_state, agent_action, mask, agent_next_state, reward)
-            #break # 
+        agent_action = torch.Tensor([action[amax,:].flatten()]).to(device)
+        agent_next_state = torch.Tensor([next_state[amax,:].flatten()]).to(device)
+        agent_state = torch.Tensor([state[amax,:].flatten()]).to(device)
+        memory.push(agent_state, agent_action, mask, agent_next_state, reward)
+
+        # for n in range(n_agents):
+        #     agent_action = torch.Tensor([action[n,:].flatten()]).to(device)
+        #     agent_next_state = torch.Tensor([next_state[n,:].flatten()]).to(device)
+        #     agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
+        #     memory.push(agent_state, agent_action, mask, agent_next_state, reward)
+
 
         state = next_state
 
@@ -156,7 +161,7 @@ for i_episode in range(args.num_episodes):
                 action[n, :] = agent_action.cpu().numpy()
             #action = agent.select_action(state)
 
-            next_state, reward, done, _ = env.step(action) # TODO
+            (amax, next_state), reward, done, _ = env.step(action) # TODO
             episode_reward += reward
 
             state = next_state
