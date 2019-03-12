@@ -115,11 +115,11 @@ class DDPG(object):
         self.actor = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.actor_target = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.actor_perturbed = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-4) # TODO reduced learning rates
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-5) # TODO reduced learning rates
 
         self.critic = Critic(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.critic_target = Critic(hidden_size, self.num_inputs, self.action_space).to(self.device)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-4)
 
 
         self.gamma = gamma
