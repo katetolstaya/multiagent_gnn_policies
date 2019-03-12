@@ -32,9 +32,9 @@ parser.add_argument('--ou_noise', type=bool, default=True)
 parser.add_argument('--param_noise', type=bool, default=False)
 parser.add_argument('--noise_scale', type=float, default=0.3, metavar='G',
                     help='initial noise scale (default: 0.3)')
-parser.add_argument('--final_noise_scale', type=float, default=0.1, metavar='G',
+parser.add_argument('--final_noise_scale', type=float, default=0.3, metavar='G',
                     help='final noise scale (default: 0.3)')
-parser.add_argument('--exploration_end', type=int, default=300, metavar='N',
+parser.add_argument('--exploration_end', type=int, default=100, metavar='N',
                     help='number of episodes with noise (default: 100)')
 parser.add_argument('--seed', type=int, default=4, metavar='N',
                     help='random seed (default: 4)')
@@ -48,7 +48,7 @@ parser.add_argument('--hidden_size', type=int, default=36, metavar='N',
                     help='hidden units (default: 36)')
 parser.add_argument('--updates_per_step', type=int, default=5, metavar='N',
                     help='model updates per simulator step (default: 5)')
-parser.add_argument('--replay_size', type=int, default=1000000, metavar='N',
+parser.add_argument('--replay_size', type=int, default=1000, metavar='N',
                     help='size of replay buffer (default: 1000000)')
 args = parser.parse_args()
 
