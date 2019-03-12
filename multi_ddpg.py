@@ -7,6 +7,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn import Parameter
 import math
+import numbers
 
 def soft_update(target, source, tau):
     for target_param, param in zip(target.parameters(), source.parameters()):
@@ -15,6 +16,47 @@ def soft_update(target, source, tau):
 def hard_update(target, source):
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(param.data)
+
+# class TiedLayerNorm(nn.Module):
+ 
+#     __constants__ = ['normalized_shape', 'weight', 'bias', 'eps']
+
+#     def __init__(self, normalized_shape, eps=1e-5, elementwise_affine=True):
+#         super(TiedLayerNorm, self).__init__()
+#         self.n_agents = 30
+#         if isinstance(normalized_shape, numbers.Integral):
+#             normalized_shape = (normalized_shape*self.n_agents,)
+#         self.normalized_shape = torch.Size(normalized_shape)
+
+#         self.eps = eps
+#         self.elementwise_affine = elementwise_affine
+
+#         if self.elementwise_affine:
+#             self.weight = Parameter(torch.Tensor(normalized_shape))
+#             print(normalized_shape)
+#             print(self.weight.shape)
+#             self.bias = Parameter(torch.Tensor(normalized_shape))
+#         else:
+#             self.register_parameter('weight', None)
+#             self.register_parameter('bias', None)
+#         self.reset_parameters()
+
+#     def reset_parameters(self):
+#         if self.elementwise_affine:
+#             nn.init.ones_(self.weight)
+#             nn.init.zeros_(self.bias)
+
+#     def forward(self, input):
+#         print(self.bias.shape)
+#         repeated_bias = self.bias.repeat(self.n_agents) #.flatten()
+#         print(repeated_bias.shape)
+#         repeated_weight = self.weight.repeat(self.n_agents) #.flatten()
+#         return F.layer_norm(
+#             input, self.normalized_shape, repeated_weight, repeated_bias, self.eps)
+
+#     def extra_repr(self):
+#         return '{normalized_shape}, eps={eps}, ' \
+#             'elementwise_affine={elementwise_affine}'.format(**self.__dict__)
 
 class TiedLinear(nn.Module):
     def __init__(self, in_features, out_features, bias=True):
@@ -28,6 +70,8 @@ class TiedLinear(nn.Module):
         else:
             self.register_parameter('bias', None)
         self.reset_parameters()
+        # self.weight = self.weight.repeat(self.n_agents, self.n_agents) #.flatten()
+        # self.bias = self.bias.repeat(1, self.n_agents) #.flatten()
 
     def reset_parameters(self):
         stdv = 1. / math.sqrt(self.weight.size(0))
@@ -48,15 +92,21 @@ class Actor(nn.Module):
         self.action_space = action_space
         self.n_agents = 30
         self.num_outputs = 2 #int(action_space.shape[0]/self.n_agents)
-        self.num_inputs = 12 #int(num_inputs/self.n_agents)
+        self.num_inputs = 18 #int(num_inputs/self.n_agents)
 
         self.linear1 = TiedLinear(self.num_inputs, hidden_size)
+        #nn.Conv1d(1, hidden_size, kernel_size=self.num_inputs, stride=self.num_inputs, groups=self.n_agents, bias=True)
+        #
         self.ln1 = nn.LayerNorm(hidden_size*self.n_agents)
 
         self.linear2 = TiedLinear(hidden_size, hidden_size)
+        #nn.Conv1d(hidden_size, hidden_size, kernel_size=1, stride=1, groups=self.n_agents, bias=True)
+        #
         self.ln2 = nn.LayerNorm(hidden_size*self.n_agents)
 
         self.mu = TiedLinear(hidden_size, self.num_outputs)
+        #nn.Conv1d(1, 2, kernel_size=1, stride=1,groups=self.n_agents, bias=True)
+        #
         self.mu.weight.data.mul_(0.1)
         self.mu.bias.data.mul_(0.1)
 
@@ -89,7 +139,7 @@ class Critic(nn.Module):
         self.action_space = action_space
         self.n_agents = 30
         self.num_outputs = 2 #int(action_space.shape[0]/self.n_agents)
-        self.num_inputs = 12 #int(num_inputs/self.n_agents)
+        self.num_inputs = 18 #int(num_inputs/self.n_agents)
 
         self.linear1 = TiedLinear(self.num_inputs + self.num_outputs, hidden_size)
         self.ln1 = nn.LayerNorm(hidden_size*self.n_agents)
@@ -98,6 +148,7 @@ class Critic(nn.Module):
         self.ln2 = nn.LayerNorm(hidden_size*self.n_agents)
 
         self.V = TiedLinear(hidden_size, 1)
+        # self.V = TiedLinear(hidden_size, self.n_agents) # for min, then return min value
         self.V.weight.data.mul_(0.1)
         self.V.bias.data.mul_(0.1)
 
@@ -110,7 +161,7 @@ class Critic(nn.Module):
         x = self.ln2(x)
         x = F.relu(x)
         V = self.V(x)
-        return V
+        return torch.sum(V)
 
         # V = torch.zeros([1], dtype=torch.float32)
         # V = []
@@ -136,11 +187,11 @@ class DDPG(object):
         self.actor = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.actor_target = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.actor_perturbed = Actor(hidden_size, self.num_inputs, self.action_space).to(self.device)
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-4)
+        self.actor_optim = Adam(self.actor.parameters(), lr=5e-6) # TODO reduced learning rates
 
         self.critic = Critic(hidden_size, self.num_inputs, self.action_space).to(self.device)
         self.critic_target = Critic(hidden_size, self.num_inputs, self.action_space).to(self.device)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr=5e-5)
 
 
         self.gamma = gamma
