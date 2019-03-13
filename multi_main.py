@@ -30,9 +30,9 @@ parser.add_argument('--tau', type=float, default=0.001, metavar='G',
                     help='discount factor for model (default: 0.001)')
 parser.add_argument('--ou_noise', type=bool, default=True)
 parser.add_argument('--param_noise', type=bool, default=False)
-parser.add_argument('--noise_scale', type=float, default=0.3, metavar='G',
+parser.add_argument('--noise_scale', type=float, default=0.1, metavar='G',
                     help='initial noise scale (default: 0.3)')
-parser.add_argument('--final_noise_scale', type=float, default=0.3, metavar='G',
+parser.add_argument('--final_noise_scale', type=float, default=0.1, metavar='G',
                     help='final noise scale (default: 0.3)')
 parser.add_argument('--exploration_end', type=int, default=100, metavar='N',
                     help='number of episodes with noise (default: 100)')
@@ -75,6 +75,7 @@ param_noise = AdaptiveParamNoiseSpec(initial_stddev=0.05,
     desired_action_stddev=args.noise_scale, adaptation_coefficient=1.05, device=device) if args.param_noise else None
 
 rewards = []
+
 total_numsteps = 0
 updates = 0
 
@@ -93,6 +94,8 @@ for i_episode in range(args.num_episodes):
         agent.perturb_actor_parameters(param_noise)
 
     episode_reward = 0
+    policy_losses = []
+    value_losses = []
     while True:
         action = agent.select_action(state, ounoise, param_noise)
         next_state, reward, done, _ = env.step(action.cpu().numpy())
@@ -114,6 +117,10 @@ for i_episode in range(args.num_episodes):
                 batch = Transition(*zip(*transitions))
 
                 value_loss, policy_loss = agent.update_parameters(batch)
+
+                policy_losses.append(policy_loss)
+                value_losses.append(value_losses)
+
 
                 writer.add_scalar('loss/value', value_loss, updates)
                 writer.add_scalar('loss/policy', policy_loss, updates)
@@ -153,6 +160,6 @@ for i_episode in range(args.num_episodes):
         writer.add_scalar('reward/test', episode_reward, i_episode)
 
         rewards.append(episode_reward)
-        print("Episode: {}, total numsteps: {}, reward: {}, average reward: {}".format(i_episode, total_numsteps, rewards[-1], np.mean(rewards[-10:])))
+        print("Episode: {}, total numsteps: {}, reward: {}, average reward: {}, average policy loss: {}, average value loss: {}".format(i_episode, total_numsteps, rewards[-1], np.mean(rewards[-10:]), np.mean(policy_losses), np.mean(value_losses)))
     
 env.close()
