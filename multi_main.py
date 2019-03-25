@@ -82,6 +82,9 @@ updates = 0
 state = env.reset()
 n_agents = state.shape[0]
 
+policy_losses = 0
+value_losses = 0
+last_updates = 0
 for i_episode in range(args.num_episodes):
     state = torch.Tensor([env.reset()]).to(device)
 
@@ -94,8 +97,7 @@ for i_episode in range(args.num_episodes):
         agent.perturb_actor_parameters(param_noise)
 
     episode_reward = 0
-    policy_losses = []
-    value_losses = []
+
     while True:
         action = agent.select_action(state, ounoise, param_noise)
         next_state, reward, done, _ = env.step(action.cpu().numpy())
@@ -118,8 +120,8 @@ for i_episode in range(args.num_episodes):
 
                 value_loss, policy_loss = agent.update_parameters(batch)
 
-                policy_losses.append(policy_loss)
-                value_losses.append(value_losses)
+                policy_losses = policy_losses + policy_loss
+                value_losses = value_losses + value_loss
 
 
                 writer.add_scalar('loss/value', value_loss, updates)
@@ -143,6 +145,9 @@ for i_episode in range(args.num_episodes):
 
     rewards.append(episode_reward)
     if i_episode % 10 == 0:
+
+        policy_losses = policy_losses / (updates - last_updates)
+        value_losses = value_losses / (updates - last_updates)
         state = torch.Tensor([env.reset()]).to(device)
         episode_reward = 0
         while True:
@@ -160,6 +165,9 @@ for i_episode in range(args.num_episodes):
         writer.add_scalar('reward/test', episode_reward, i_episode)
 
         rewards.append(episode_reward)
-        print("Episode: {}, total numsteps: {}, reward: {}, average reward: {}, average policy loss: {}, average value loss: {}".format(i_episode, total_numsteps, rewards[-1], np.mean(rewards[-10:]), np.mean(policy_losses), np.mean(value_losses)))
+        print("Episode: {}, total numsteps: {}, reward: {}, average reward: {}, average policy loss: {}, average value loss: {}".format(i_episode, total_numsteps, rewards[-1], np.mean(rewards[-10:]), policy_losses, value_losses))
     
+    policy_losses = 0
+    value_losses = 0
+    last_updates = updates 
 env.close()
