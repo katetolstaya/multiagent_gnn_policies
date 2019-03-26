@@ -28,10 +28,11 @@ def train_model(env, theta, sigma, common=True, step_size=0.0001):
                 for i in range(n_agents):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * costs[i]
             else: 
+                #step_size = step_size * 0.5
                 avg_cost = np.sum(costs) #/n_agents
                 for i in range(n_agents):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * avg_cost
- 
+            
             theta = theta + step_size * grad 
 
         state = next_state
@@ -83,7 +84,7 @@ parser.add_argument('--final_noise_scale', type=float, default=0.3, metavar='G',
                     help='final noise scale (default: 0.3)')
 parser.add_argument('--exploration_end', type=int, default=100, metavar='N',
                     help='number of episodes with noise (default: 100)')
-parser.add_argument('--seed', type=int, default=43, metavar='N',
+parser.add_argument('--seed', type=int, default=8, metavar='N',
                     help='random seed (default: 4)')
 parser.add_argument('--num_steps', type=int, default=500, metavar='N',
                     help='max episode length (default: 1000)')
