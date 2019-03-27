@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from gym import wrappers
 import gym_flock
 
-def train_model(env, theta, sigma, common=True, step_size=0.000001):
+def train_model(env, theta, sigma, common=True, step_size=0.00001):
 
     # train
     state = env.reset()
@@ -22,7 +22,7 @@ def train_model(env, theta, sigma, common=True, step_size=0.000001):
         next_state, reward, done, _ = env.step(action.flatten())
         next_state, costs = next_state
 
-        if step % 10 == 0:
+        if step % 20 == 0:
             grad = np.zeros((n_features, n_actions))
 
             if not common:
@@ -86,7 +86,7 @@ parser.add_argument('--final_noise_scale', type=float, default=0.3, metavar='G',
                     help='final noise scale (default: 0.3)')
 parser.add_argument('--exploration_end', type=int, default=100, metavar='N',
                     help='number of episodes with noise (default: 100)')
-parser.add_argument('--seed', type=int, default=17, metavar='N',
+parser.add_argument('--seed', type=int, default=36, metavar='N',
                     help='random seed (default: 4)')
 parser.add_argument('--num_steps', type=int, default=500, metavar='N',
                     help='max episode length (default: 1000)')
@@ -120,14 +120,14 @@ fig, ax = plt.subplots(facecolor='white')
 line, = ax.plot([], [], linewidth=2, color='g')
 line1, = ax.plot([], [], linewidth=2, color='r')
 line2, = ax.plot([], [], linewidth=2, color='b')
-ax.set_xlim([0, 1000])
+ax.set_xlim([0, 10000])
 ax.set_ylim([-8000, 0])
 plt.legend((line, line1, line2), ('expert', 'global reward', 'local reward'))
 plt.ylabel('test reward')
 plt.xlabel('training episodes')
 
 print("Baseline\tCommon\tLocal")
-step_size=0.000001
+step_size=0.00001
 
 for i_episode in range(args.num_episodes):
     #step_size = step_size * 0.99
@@ -135,7 +135,7 @@ for i_episode in range(args.num_episodes):
     theta1 = train_model(env, theta1, sigma, common=True,step_size=step_size)
     theta2 = train_model(env, theta2, sigma, common=False, step_size=step_size)
 
-    if i_episode % 5 == 0:
+    if i_episode % 10 == 0:
         seed_state = np.random.get_state()
         baseline_reward = int(baseline(env))
 
