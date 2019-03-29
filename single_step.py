@@ -116,18 +116,18 @@ rewards1 = []
 rewards2 = []
 eps = []
 
-plt.ion()
-fig, ax = plt.subplots(facecolor='white')
-line, = ax.plot([], [], linewidth=2, color='g')
-line0, = ax.plot([], [], linewidth=2, color='r')
-line2, = ax.plot([], [], linewidth=2, color='b')
-line1, = ax.plot([], [], linewidth=2, color='k')
+# plt.ion()
+# fig, ax = plt.subplots(facecolor='white')
+# line, = ax.plot([], [], linewidth=2, color='g')
+# line0, = ax.plot([], [], linewidth=2, color='r')
+# line2, = ax.plot([], [], linewidth=2, color='b')
+# line1, = ax.plot([], [], linewidth=2, color='k')
 
-ax.set_xlim([0, 10000])
-ax.set_ylim([-8000, 0])
-plt.legend((line, line0, line1, line2), ('optimal', 'consensus', 'global reward', 'local reward'))
-plt.ylabel('test reward')
-plt.xlabel('training episodes')
+# ax.set_xlim([0, 10000])
+# ax.set_ylim([-8000, 0])
+# plt.legend((line, line0, line1, line2), ('optimal', 'consensus', 'global reward', 'local reward'))
+# plt.ylabel('test reward')
+# plt.xlabel('training episodes')
 
 print("Optimal\tConsensus\tCommon\tLocal")
 step_size=0.0002
@@ -161,21 +161,21 @@ for i_episode in range(args.num_episodes):
         rewards2.append(reward2)
         eps.append(i_episode)
 
-        line.set_xdata(eps)
-        line.set_ydata(baselines)
+        # line.set_xdata(eps)
+        # line.set_ydata(baselines)
 
-        line0.set_xdata(eps)
-        line0.set_ydata(baselines0)
-        line2.set_xdata(eps)
-        line2.set_ydata(rewards2)
+        # line0.set_xdata(eps)
+        # line0.set_ydata(baselines0)
+        # line2.set_xdata(eps)
+        # line2.set_ydata(rewards2)
 
-        line1.set_xdata(eps)
-        line1.set_ydata(rewards1)
+        # line1.set_xdata(eps)
+        # line1.set_ydata(rewards1)
 
 
 
-        fig.canvas.draw()
-        fig.canvas.flush_events()
+        # fig.canvas.draw()
+        # fig.canvas.flush_events()
 
 
         print(str(baseline_reward) + "\t" +  str(baseline0_reward) + "\t" + str(reward1) + "\t" + str(reward2))
