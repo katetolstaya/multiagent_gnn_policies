@@ -30,7 +30,7 @@ def train_model(env, theta, sigma, common=True, step_size=0.00001):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * costs[i]
             else:
 
-                avg_cost = np.sum(costs) #* 0.25 # /n_agents
+                avg_cost = np.sum(costs) /n_agents
                 for i in range(n_agents):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * avg_cost
             
@@ -86,7 +86,7 @@ parser.add_argument('--final_noise_scale', type=float, default=0.3, metavar='G',
                     help='final noise scale (default: 0.3)')
 parser.add_argument('--exploration_end', type=int, default=100, metavar='N',
                     help='number of episodes with noise (default: 100)')
-parser.add_argument('--seed', type=int, default=8, metavar='N',
+parser.add_argument('--seed', type=int, default=10, metavar='N',
                     help='random seed (default: 4)')
 parser.add_argument('--num_steps', type=int, default=500, metavar='N',
                     help='max episode length (default: 1000)')
@@ -105,7 +105,7 @@ n_agents = 50
 # n_actions = 2
 n_features = 8
 n_actions = 1
-sigma = 5.0
+sigma = 1.0
 
 theta1 =  (np.random.rand(n_features, n_actions) * 2 - 1)
 theta2 = np.copy(theta1)
@@ -123,14 +123,14 @@ line0, = ax.plot([], [], linewidth=2, color='r')
 line2, = ax.plot([], [], linewidth=2, color='b')
 line1, = ax.plot([], [], linewidth=2, color='k')
 
-ax.set_xlim([0, 3000])
+ax.set_xlim([0, 10000])
 ax.set_ylim([-8000, 0])
 plt.legend((line, line0, line1, line2), ('optimal', 'consensus', 'global reward', 'local reward'))
 plt.ylabel('test reward')
 plt.xlabel('training episodes')
 
 print("Optimal\tConsensus\tCommon\tLocal")
-step_size=0.0000001
+step_size=0.0002
 
 for i_episode in range(args.num_episodes):
     #step_size = step_size * 0.99
