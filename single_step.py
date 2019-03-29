@@ -30,7 +30,7 @@ def train_model(env, theta, sigma, common=True, step_size=0.00001):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * costs[i]
             else:
 
-                avg_cost = np.sum(costs) * 0.25 # /n_agents
+                avg_cost = np.sum(costs) #* 0.25 # /n_agents
                 for i in range(n_agents):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * avg_cost
             
@@ -86,7 +86,7 @@ parser.add_argument('--final_noise_scale', type=float, default=0.3, metavar='G',
                     help='final noise scale (default: 0.3)')
 parser.add_argument('--exploration_end', type=int, default=100, metavar='N',
                     help='number of episodes with noise (default: 100)')
-parser.add_argument('--seed', type=int, default=7, metavar='N',
+parser.add_argument('--seed', type=int, default=8, metavar='N',
                     help='random seed (default: 4)')
 parser.add_argument('--num_steps', type=int, default=500, metavar='N',
                     help='max episode length (default: 1000)')
@@ -120,8 +120,9 @@ plt.ion()
 fig, ax = plt.subplots(facecolor='white')
 line, = ax.plot([], [], linewidth=2, color='g')
 line0, = ax.plot([], [], linewidth=2, color='r')
-line1, = ax.plot([], [], linewidth=2, color='k')
 line2, = ax.plot([], [], linewidth=2, color='b')
+line1, = ax.plot([], [], linewidth=2, color='k')
+
 ax.set_xlim([0, 3000])
 ax.set_ylim([-8000, 0])
 plt.legend((line, line0, line1, line2), ('optimal', 'consensus', 'global reward', 'local reward'))
@@ -129,13 +130,13 @@ plt.ylabel('test reward')
 plt.xlabel('training episodes')
 
 print("Optimal\tConsensus\tCommon\tLocal")
-step_size=0.000002
+step_size=0.0000001
 
 for i_episode in range(args.num_episodes):
     #step_size = step_size * 0.99
 
     theta1 = train_model(env, theta1, sigma, common=True,step_size=step_size)
-    theta2 = train_model(env, theta2, sigma, common=False, step_size=step_size)
+    #theta2 = train_model(env, theta2, sigma, common=False, step_size=step_size)
 
     if i_episode % 10 == 0:
         seed_state = np.random.get_state()
@@ -152,7 +153,7 @@ for i_episode in range(args.num_episodes):
 
         if seed_state is not None:
             np.random.set_state(seed_state)
-        reward2 = int(test_model(env,theta2))
+        reward2 = 0 #int(test_model(env,theta2))
 
         baselines.append(baseline_reward)
         baselines0.append(baseline0_reward)
@@ -165,13 +166,13 @@ for i_episode in range(args.num_episodes):
 
         line0.set_xdata(eps)
         line0.set_ydata(baselines0)
-
+        line2.set_xdata(eps)
+        line2.set_ydata(rewards2)
 
         line1.set_xdata(eps)
         line1.set_ydata(rewards1)
 
-        line2.set_xdata(eps)
-        line2.set_ydata(rewards2)
+
 
         fig.canvas.draw()
         fig.canvas.flush_events()
