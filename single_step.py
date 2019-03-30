@@ -130,7 +130,7 @@ eps = []
 # plt.xlabel('training episodes')
 
 print("Optimal\tConsensus\tCommon\tLocal")
-step_size=0.0002
+step_size=0.00002
 
 for i_episode in range(args.num_episodes):
     #step_size = step_size * 0.99
