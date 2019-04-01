@@ -9,9 +9,9 @@ from torch.nn import Parameter
 import math
 import numbers
 
-N_AGENTS = 15
-N_STATES = 18
-N_ACTIONS = 2
+N_AGENTS = 50
+N_STATES = 12
+N_ACTIONS = 1
 
 def soft_update(target, source, tau):
     for target_param, param in zip(target.parameters(), source.parameters()):

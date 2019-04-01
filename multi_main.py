@@ -20,7 +20,7 @@ from replay_memory import ReplayMemory, Transition
 
 
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
-parser.add_argument('--env-name', default="FlockingMulti-v0",
+parser.add_argument('--env-name', default="Consensus-v0",  #"FlockingMulti-v0",
                     help='name of the environment to run')
 parser.add_argument('--algo', default='DDPG',
                     help='algorithm to use: DDPG | NAF')
@@ -106,7 +106,7 @@ for i_episode in range(args.num_episodes):
 
         #action = torch.Tensor(action)
         mask = torch.Tensor([not done]).to(device)
-        next_state = torch.Tensor([next_state]).to(device)
+        next_state = torch.Tensor([next_state[0].flatten()]).to(device)
         reward = torch.Tensor([reward]).to(device)
 
         memory.push(state, action, mask, next_state, reward)
@@ -156,7 +156,7 @@ for i_episode in range(args.num_episodes):
             next_state, reward, done, _ = env.step(action.cpu().numpy())
             episode_reward += reward
 
-            next_state = torch.Tensor([next_state]).to(device)
+            next_state = torch.Tensor([next_state[0].flatten()]).to(device)
 
             state = next_state
             if done:

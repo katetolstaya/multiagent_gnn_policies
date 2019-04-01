@@ -30,13 +30,13 @@ def train_model(env, theta, mom, var, sigma, common=True, step_size=0.00001):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * costs[i]
             else:
 
-                avg_cost = np.sum(costs) /n_agents
+                avg_cost = np.sum(costs) #* 1.0 /n_agents
                 for i in range(n_agents):
                     grad = grad + (action[i, :]-pi_s[i, :]).reshape(1, n_actions) * (state[i, :]).reshape(n_features, 1) * avg_cost
-            mom = 0.9 * mom + 0.1 * grad
-            var = 0.999 * var + 0.001 * np.square(grad)
-            theta = theta + step_size * np.divide(mom, np.sqrt(var) + 0.000001)
-            # theta = theta + step_size * grad 
+            #mom = 0.9 * mom + 0.1 * grad
+            #var = 0.99 * var + 0.01 * np.square(grad)
+            #theta = theta + step_size * np.divide(mom, np.sqrt(var) + 0.000001)
+            theta = theta + step_size * grad 
 
         state = next_state
         step = step + 1
@@ -44,7 +44,7 @@ def train_model(env, theta, mom, var, sigma, common=True, step_size=0.00001):
         if done:
             break
 
-    return theta
+    return theta, mom, var
 
 
 def test_model(env, weights):
@@ -89,7 +89,7 @@ parser.add_argument('--final_noise_scale', type=float, default=0.3, metavar='G',
                     help='final noise scale (default: 0.3)')
 parser.add_argument('--exploration_end', type=int, default=100, metavar='N',
                     help='number of episodes with noise (default: 100)')
-parser.add_argument('--seed', type=int, default=12, metavar='N',
+parser.add_argument('--seed', type=int, default=15, metavar='N',
                     help='random seed (default: 4)')
 parser.add_argument('--num_steps', type=int, default=500, metavar='N',
                     help='max episode length (default: 1000)')
@@ -106,17 +106,18 @@ state = env.reset()
 n_agents = 50
 # n_features = 18
 # n_actions = 2
-n_features = 6
+n_features = 12
 n_actions = 1
-sigma = 1.0
+sigma = 3.0
+# sigma = 1.0
 
 theta1 =  (np.random.rand(n_features, n_actions) * 2 - 1)
-theta2 = np.copy(theta1)
+# theta2 = np.copy(theta1)
 
 mom1 = np.zeros(np.shape(theta1))
-mom2 = np.zeros(np.shape(theta1))
+# mom2 = np.zeros(np.shape(theta1))
 var1 = np.zeros(np.shape(theta1))
-var2 = np.zeros(np.shape(theta1))
+# var2 = np.zeros(np.shape(theta1))
 
 
 baselines = []
@@ -138,14 +139,14 @@ eps = []
 # plt.ylabel('test reward')
 # plt.xlabel('training episodes')
 
-print("Optimal\tConsensus\tCommon\tLocal")
+print("Optimal\tConsensus\tCommon")
 # step_size=0.00002
-step_size=0.001
+step_size= 0.000001
 
 for i_episode in range(args.num_episodes):
     #step_size = step_size * 0.99
 
-    theta1 = train_model(env, theta1, mom1, var1, sigma, common=True,step_size=step_size)
+    theta1, mom1, var1 = train_model(env, theta1, mom1, var1, sigma, common=False,step_size=step_size)
     #theta2 = train_model(env, theta2, sigma, common=False, step_size=step_size)
 
     if i_episode % 10 == 0:
@@ -161,14 +162,9 @@ for i_episode in range(args.num_episodes):
             np.random.set_state(seed_state)
         reward1 = int(test_model(env,theta1))
 
-        if seed_state is not None:
-            np.random.set_state(seed_state)
-        reward2 = 0 #int(test_model(env,theta2))
-
         baselines.append(baseline_reward)
         baselines0.append(baseline0_reward)
         rewards1.append(reward1)
-        rewards2.append(reward2)
         eps.append(i_episode)
 
         # line.set_xdata(eps)
@@ -188,7 +184,7 @@ for i_episode in range(args.num_episodes):
         # fig.canvas.flush_events()
 
 
-        print(str(baseline_reward) + "\t" +  str(baseline0_reward) + "\t" + str(reward1) + "\t" + str(reward2))
+        print(str(baseline_reward) + "\t" +  str(baseline0_reward) + "\t" + str(reward1) )
 
 
 
