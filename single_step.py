@@ -141,7 +141,7 @@ eps = []
 
 print("Optimal\tConsensus\tCommon")
 # step_size=0.00002
-step_size= 0.000001
+step_size= 0.000005
 
 for i_episode in range(args.num_episodes):
     #step_size = step_size * 0.99
