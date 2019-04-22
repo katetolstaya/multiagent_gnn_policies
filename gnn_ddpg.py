@@ -3,6 +3,7 @@ import numpy as np
 import os
 from collections import namedtuple
 import random
+import gym
 
 import torch
 import torch.nn as nn
@@ -10,7 +11,6 @@ import torch.nn.functional as F
 from torch.optim import Adam
 from torch.autograd import Variable
 
-import gym
 
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
@@ -23,6 +23,7 @@ parser.add_argument('--n_agents', type=int, default=100, help='n_agents')
 args = parser.parse_args()
 
 Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 'reward', 'gso', 'next_gso'))
+
 
 # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
@@ -64,124 +65,153 @@ class ReplayBuffer(object):
         self.buffer = []
         self.curr_size = 0
 
-# TODO move these generic implementations to a different file for later
-class GNN(nn.Module):
-
-    def __init__(self, layers, K):
-        super(GNN, self).__init__()
-
-        self.layers = layers
-        self.n_layers = len(layers) - 1
-        self.conv_layers = []
-
-        for i in range(self.n_layers):
-            m = nn.Conv1d(in_channels=K, out_channels=layers[i + 1], kernel_size=(layers[i], 1), stride=(layers[i], 1))
-            self.conv_layers.append(m)
-        self.conv_layers = torch.nn.ModuleList(self.conv_layers)
-        # self.activation = nn.Tanh()
-
-    def forward(self, inputs, graph_shift_ops):
-        batch_size = np.shape(inputs)[0]
-        x = inputs
-        for i in range(self.n_layers - 1):
-            x = torch.matmul(x, graph_shift_ops)
-            # x = self.activation(self.conv_layers[i](x))
-            x = F.relu(self.conv_layers[i](x))
-            x = x.view((batch_size, 1, self.layers[i + 1], -1))
-        x = self.conv_layers[self.n_layers](x)
-
-        return x  # size of x here is batch_size x output_layer x 1 x n_agents
-
-
-class DelayGNN(nn.Module):
-
-    def __init__(self, layers, K):
-        super(DelayGNN, self).__init__()
-
-        self.layers = layers
-        self.n_layers = len(layers) - 1
-
-        self.conv_layers = []
-        m = nn.Conv1d(in_channels=K, out_channels=layers[1], kernel_size=(layers[0], 1), stride=(layers[0], 1))
-        self.conv_layers.append(m)
-
-        for i in range(1, self.n_layers):
-            m = nn.Conv1d(in_channels=1, out_channels=layers[i + 1], kernel_size=(layers[i], 1), stride=(layers[i], 1))
-            self.conv_layers.append(m)
-
-        self.conv_layers = torch.nn.ModuleList(self.conv_layers)
-
-    def forward(self, inputs, graph_shift_ops):
-        x = inputs
-        x = torch.matmul(x, graph_shift_ops)
-
-        for i in range(self.n_layers - 1):
-            x = F.relu(self.conv_layers[i](x))
-            # x = x.view((-1, 1, self.layers[i + 1], self.n_agents))  # necessary?
-
-        x = self.conv_layers[self.n_layers](x)
-
-        return x  # size of x here is batch_size x output_layer x 1 x n_agents
-
 
 class Critic(nn.Module):
 
-    def __init__(self, layers, K):
+    def __init__(self, n_s, n_a, hidden_layers, k):
+        """
+        The actor network is centralized, so it can have any number of [GSO -> Linearity -> Activation] layers
+        If there's a lot of layers here, it doesn't matter if we have a non-linearity or GSO first (test this).
+        :param n_s: number of MDP states per agent
+        :param n_a: number of MDP actions per agent
+        :param hidden_layers: list of ints that will determine the width of each hidden layer
+        :param k: aggregation filter length
+        """
         super(Critic, self).__init__()
 
-        self.layers = layers
-        self.n_layers = len(layers) - 1
+        self.k = k
+        self.n_s = n_s
+        self.n_a = n_a
+
+        self.layers = [self.n_s + self.n_a] + hidden_layers + [1]
+        self.n_layers = len(self.layers) - 1
         self.conv_layers = []
+        self.gso_first = True
 
         for i in range(self.n_layers):
-            m = nn.Conv1d(in_channels=K, out_channels=layers[i + 1], kernel_size=(layers[i], 1), stride=(layers[i], 1))
+
+            if i > 0 or self.gso_first:
+                in_channels = k
+            else:
+                in_channels = 1
+
+            m = nn.Conv2d(in_channels=in_channels, out_channels=self.layers[i + 1], kernel_size=(self.layers[i], 1),
+                          stride=(self.layers[i], 1))
             self.conv_layers.append(m)
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
-        # self.activation = nn.Tanh()
 
     def forward(self, states, actions, graph_shift_ops):
+        """
+        Evaluate the critic network
+        :param states: Current states of shape (B,1,n_s,N), where B = # batches, n_s = # features, N = # agents
+        :param actions: Current actions of shape (B,1,n_a,N), where B = # batches, n_a = # features, N = # agents
+        :param graph_shift_ops: Current GSO = [I, A_t, A_t^2,..., A_t^K-1] of shape (B,K,N,N)
+        :return:
+        """
+
         batch_size = np.shape(states)[0]
+        n_agents = states.shape[3]
+
+        assert batch_size == actions.shape[0]
+        assert batch_size == graph_shift_ops.shape[0]
+        assert actions.shape[3] == n_agents
+        assert states.shape[1] == 1
+        assert actions.shape[1] == 1
+        assert states.shape[2] == self.n_s
+        assert actions.shape[2] == self.n_a
+        assert graph_shift_ops.shape[1] == self.k
+        assert graph_shift_ops.shape[2] == n_agents
+        assert graph_shift_ops.shape[3] == n_agents
+
         x = torch.cat((states, actions), 2)
-        for i in range(self.n_layers - 1):
-            x = torch.matmul(x, graph_shift_ops)
-            # x = self.activation(self.conv_layers[i](x))
-            x = F.relu(self.conv_layers[i](x))
-            x = x.view((batch_size, 1, self.layers[i + 1], -1))
-        x = self.conv_layers[self.n_layers](x)
+
+        # GSO -> Linearity -> Activation
+        for i in range(self.n_layers):
+
+            if i > 0 or self.gso_first:
+                x = torch.matmul(x, graph_shift_ops)  # GSO
+
+            x = self.conv_layers[i](x)  # Linear layer
+
+            if i < self.n_layers - 1:  # last layer needs no relu()
+                x = F.relu(x)
+
+            x = x.view((batch_size, 1, self.layers[i + 1], n_agents))
+
+        x = x.view((batch_size, 1, n_agents))  # now size (B, 1, N)
 
         return x  # size of x here is batch_size x output_layer x 1 x n_agents
 
 
 class Actor(nn.Module):
 
-    def __init__(self, layers, K):
+    def __init__(self, n_s, n_a, hidden_layers, k, ind_agg):
+        """
+        The policy network is allowed to have only one aggregation operation due to communication latency, but we can
+        have any number of hidden layers to be executed by each agent individually.
+        :param n_s: number of MDP states per agent
+        :param n_a: number of MDP actions per agent
+        :param hidden_layers: list of ints that will determine the width of each hidden layer
+        :param k: aggregation filter length
+        :param ind_agg: before which MLP layer index to aggregate
+        """
         super(Actor, self).__init__()
 
-        self.layers = layers
-        self.n_layers = len(layers) - 1
+        self.layers = [n_s] + hidden_layers + [n_a]
+        self.n_layers = len(self.layers) - 1
+
+        self.ind_agg = ind_agg  # before which conv layer the aggregation happens
 
         self.conv_layers = []
-        m = nn.Conv1d(in_channels=K, out_channels=layers[1], kernel_size=(layers[0], 1), stride=(layers[0], 1))
-        self.conv_layers.append(m)
 
-        for i in range(1, self.n_layers):
-            m = nn.Conv1d(in_channels=1, out_channels=layers[i + 1], kernel_size=(layers[i], 1), stride=(layers[i], 1))
+        for i in range(0, self.n_layers):
+
+            if i == self.ind_agg:  # after the GSO, reduce dimensions
+                step = k
+            else:
+                step = 1
+
+            m = nn.Conv2d(in_channels=self.layers[i], out_channels=self.layers[i + 1], kernel_size=(step, 1), stride=(step, 1))
+
             self.conv_layers.append(m)
 
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
     def forward(self, states, graph_shift_ops):
+        """
+        The policy relies on delayed information from neighbors. During training, the full history for k time steps is
+        necessary.
+        :param states: History of states: x_t, x_t-1,...x_t-k+1 of shape (B,K,F,N)
+        :param graph_shift_ops: Delayed GSO: [I, A_t, A_t A_t-1, A_t ... A_t-k+1] of shape (B,K,N,N)
+        :return:
+        """
+        batch_size = states.shape[0]
+        n_agents = states.shape[3]
+        assert graph_shift_ops.shape[0] == batch_size
+        assert graph_shift_ops.shape[2] == n_agents
+        assert graph_shift_ops.shape[3] == n_agents
+        assert states.shape[1] == 1
+        assert states.shape[2] == self.n_s
+        assert graph_shift_ops.shape[1] == self.k
+
         x = states
-        x = torch.matmul(x, graph_shift_ops)
+        x = x.permute(0, 2, 1, 3)  # now (B,F,K,N)
 
-        for i in range(self.n_layers - 1):
-            x = F.relu(self.conv_layers[i](x))
-            # x = x.view((-1, 1, self.layers[i + 1], self.n_agents))  # necessary?
+        for i in range(self.n_layers):
 
-        x = self.conv_layers[self.n_layers](x)
+            if i == self.ind_agg:  # aggregation only happens once - otherwise each agent operates independently
+                x = x.permute(0, 2, 1, 3)   # now (B,K,F,N)
+                x = torch.matmul(x, graph_shift_ops)
+                x = x.permute(0, 2, 1, 3)  # now (B,F,K,N)
 
-        return x  # size of x here is batch_size x output_layer x 1 x n_agents
+            x = self.conv_layers[i](x)  # now (B,G,1,N)
 
+            if i < self.n_layers - 1:  # last layer - no relu
+                x = F.relu(x)
+
+        x = x.view((batch_size, self.n_a, n_agents))  # now size (B, nA, N)
+
+        return x
 
 
 class OUNoise:
@@ -189,22 +219,24 @@ class OUNoise:
     Generates noise from an Ornstein Uhlenbeck process, for temporally correlated exploration. Useful for physical
     control problems with inertia. See https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
     """
-    def __init__(self, nA, N, scale=0.3, mu=0, theta=0.15, sigma=0.2):
+
+    def __init__(self, n_a, n_agents, scale=0.3, mu=0, theta=0.15, sigma=0.2):  # TODO change default params
         """
         Initialize the Noise parameters.
-        :param nA: Size of the Action space.
+        :param n_a: Size of the Action space.
+        :param n_agents: Number of agents.
         :param scale: Scale of the noise process.
         :param mu: The mean of the noise.
         :param theta: Inertial term for drift..
         :param sigma: Standard deviation of noise.
         """
-        self.nA = nA
-        self.N = N
+        self.nA = n_a
+        self.n_agents = n_agents
         self.scale = scale
         self.mu = mu
         self.theta = theta
         self.sigma = sigma
-        self.state = np.ones(self.nA, self.N) * self.mu
+        self.state = np.ones(self.nA, self.n_agents) * self.mu
         self.reset()
 
     def reset(self):
@@ -212,7 +244,7 @@ class OUNoise:
         Reset the noise process.
         :return:
         """
-        self.state = np.ones(self.nA, self.N) * self.mu
+        self.state = np.ones(self.nA, self.n_agents) * self.mu
 
     def noise(self):
         """
@@ -250,24 +282,24 @@ class DDPG(object):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - tau) + tau * param.data)
 
-    def __init__(self, nS, nA, K, device, hidden_size=16, gamma=0.99, tau=0.5):
+    def __init__(self, n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
         """
         Initialize the DDPG networks.
-        :param nS: Size of state space.
-        :param nA: Size of action space.
+        :param n_s: Size of state space.
+        :param n_a: Size of action space.
         :param hidden_size: Size of hidden layers.
         """
         # Device
         self.device = device
 
-        actor_layers = [nS, hidden_size, hidden_size, nA]
-        critic_layers = [nS + nA, hidden_size, hidden_size, 1]
+        hidden_layers = [hidden_size, hidden_size, hidden_size, hidden_size]
+        ind_agg = int(len(hidden_layers)/2)  # aggregate halfway
 
         # Define Networks
-        self.actor = Actor(actor_layers, K).to(self.device)
-        self.actor_target = Actor(actor_layers, K).to(self.device)
-        self.critic = Critic(critic_layers, K).to(self.device)
-        self.critic_target = Critic(critic_layers, K).to(self.device)
+        self.actor = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
+        self.actor_target = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
+        self.critic = Critic(n_s, n_a, hidden_layers, k).to(self.device)
+        self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
 
         # Define Optimizers
         self.actor_optim = Adam(self.actor.parameters(), lr=1e-4)
@@ -285,6 +317,7 @@ class DDPG(object):
         """
         Evaluate the Actor network over the given state, and with injection of noise.
         :param state: The current state.
+        :param graph_shift_op: History of graph shift operators
         :param action_noise: The action noise
         :return:
         """
@@ -297,7 +330,7 @@ class DDPG(object):
         if action_noise is not None:  # Add noise if provided.
             mu += torch.Tensor(action_noise.noise()).to(self.device)
 
-        return mu #mu.clamp(-1, 1) # TODO clamp action to what space?
+        return mu  # mu.clamp(-1, 1) # TODO clamp action to what space?
 
     def gradient_step(self, batch):
         """
@@ -305,7 +338,7 @@ class DDPG(object):
         :param batch: The batch of training samples.
         :return: The loss function in the network.
         """
-        #TODO
+        # TODO
         # Collect Batch Data
         gso_batch = Variable(torch.cat(batch.gso)).to(self.device)
         next_gso_batch = Variable(torch.cat(batch.next_gso)).to(self.device)
@@ -379,12 +412,12 @@ class DDPG(object):
         if critic_path is not None:
             self.critic.load_state_dict(torch.load(critic_path).to(self.device))
 
-
+# TODO this function and then adjust the env to return state = (values, network)
 def train_ddpg(env, n_agents, device):
 
     memory = ReplayBuffer(max_size=args.buffer_size)
     ounoise = OUNoise(env.action_space.shape[0], n_agents, scale=1)
-    learner = DDPG(env.observation_space.shape[0], env.action_space.shape[0], n_agg, device=device)
+    learner = DDPG(env.observation_space.shape[0], env.action_space.shape[0], K, device=device)
 
     rewards = []
     total_numsteps = 0
@@ -394,7 +427,12 @@ def train_ddpg(env, n_agents, device):
 
     for i in range(n_episodes):
         ounoise.reset()
-        state = torch.Tensor([env.reset()]).to(device)
+
+        env_state = env.reset()  # a tuple (values, network)
+        state = torch.Tensor([env_state[0]]).to(device)
+        network = torch.Tensor([env_state[1]])
+
+        # TODO remove network self loops and normalize
 
         episode_reward = 0
         done = False
@@ -408,6 +446,19 @@ def train_ddpg(env, n_agents, device):
             notdone = torch.Tensor([not done]).to(device)
             next_state = torch.Tensor([next_state]).to(device)
             reward = torch.Tensor([reward]).to(device)
+
+            # memory needs to store:
+            # 0) just the current x value: x_t
+            # 1) delayed x values x_t, x_t-1,..., x_t-k
+            # 2) current GSO: I, A_t, A_t^2... A_t^k
+            # 3) delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
+
+            # OK, but what to do about the next state? Maybe make a named tuple for state that has all of these friends
+            # in it, so that I don't have to duplicate data... or will it be duplicated regardless?
+            # Maybe a MultiAgentStateWithDelay object to store these wonderful matrices?
+
+            # for delayed info, https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.shift.html
+            # but how to do this in-place efficiently?
 
             memory.insert(Transition(state, action, notdone, next_state, reward))
 
