@@ -412,6 +412,45 @@ class DDPG(object):
         if critic_path is not None:
             self.critic.load_state_dict(torch.load(critic_path).to(self.device))
 
+
+class MultiAgentStateWithDelay(object):
+
+
+    # TODO n_s, n_a, n_agents, k, are shared parameters
+    # xt, gso, prev_state not shared
+    def __init__(self, n_s, n_a, n_agents, k, st, gso, prev_state=None):
+        """
+        Do not need the delayed actions. This object only stores state & GSO information
+        :param n_s:
+        :param n_a:
+        :param n_agents:
+        :param k:
+        :param st:
+        :param gso:
+        :param prev_state:
+        """
+        # 0) just the current state value: x_t
+        # 1) delayed x values x_t, x_t-1,..., x_t-k
+        # 2) current GSO: I, A_t, A_t^2... A_t^k
+        # 3) delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
+
+        f = 0 # TODO num features - get from dimension of state
+
+        self.st = st
+        self.curr_gso = np.zeros((1, k, n_agents, n_agents))
+
+        if prev_state is None:
+            self.delayed_x = np.zeros((1, k, f, n_agents))
+            self.delayed_gso = np.zeros((1, k, n_agents, n_agents))
+        else:
+            self.delayed_gso = np.copy(prev_state.delayed_gso)
+            # TODO: multiply by curr network, shift, fill I
+
+            self.delayed_s = np.copy(prev_state.delayed_s)
+            # TODO: shift, fill with current state
+
+
+
 # TODO this function and then adjust the env to return state = (values, network)
 def train_ddpg(env, n_agents, device):
 
