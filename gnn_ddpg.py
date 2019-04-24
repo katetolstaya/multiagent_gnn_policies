@@ -30,9 +30,6 @@ parser.add_argument('--seed', type=int, default=3, help='random_seed')
 args = parser.parse_args()
 
 Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 'reward'))
-Parameters = namedtuple('Parameters',
-                        ('n_states', 'n_actions', 'n_agents', 'k', 'device', 'hidden_size', 'gamma', 'tau'))
-
 
 # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
