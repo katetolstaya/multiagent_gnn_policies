@@ -415,10 +415,12 @@ class DDPG(object):
 
 class MultiAgentStateWithDelay(object):
 
-
     # TODO n_s, n_a, n_agents, k, are shared parameters
+
+    # TODO the arrays in this object should be tensors on the GPU
+
     # xt, gso, prev_state not shared
-    def __init__(self, n_s, n_a, n_agents, k, st, gso, prev_state=None):
+    def __init__(self, n_s, n_a, n_agents, k, st, network, prev_state=None):
         """
         Do not need the delayed actions. This object only stores state & GSO information
         :param n_s:
@@ -426,7 +428,7 @@ class MultiAgentStateWithDelay(object):
         :param n_agents:
         :param k:
         :param st:
-        :param gso:
+        :param network:
         :param prev_state:
         """
         # 0) just the current state value: x_t
@@ -439,6 +441,8 @@ class MultiAgentStateWithDelay(object):
         self.st = st
         self.curr_gso = np.zeros((1, k, n_agents, n_agents))
 
+        # TODO remove network self loops and normalize
+
         if prev_state is None:
             self.delayed_x = np.zeros((1, k, f, n_agents))
             self.delayed_gso = np.zeros((1, k, n_agents, n_agents))
@@ -449,6 +453,8 @@ class MultiAgentStateWithDelay(object):
             self.delayed_s = np.copy(prev_state.delayed_s)
             # TODO: shift, fill with current state
 
+            # for delayed info, https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.shift.html
+            # but how to do this in-place efficiently?
 
 
 # TODO this function and then adjust the env to return state = (values, network)
@@ -468,16 +474,21 @@ def train_ddpg(env, n_agents, device):
         ounoise.reset()
 
         env_state = env.reset()  # a tuple (values, network)
+
         state = torch.Tensor([env_state[0]]).to(device)
         network = torch.Tensor([env_state[1]])
 
-        # TODO remove network self loops and normalize
+        # TODO initialize object, with prev_state as None
 
         episode_reward = 0
         done = False
         while not done:
             action = learner.select_action(state, ounoise)
             next_state, reward, done, _ = env.step(action.cpu().numpy()[0])
+            # next state is actually the state values and the current GSO
+            # TODO make the delayed state object from this new state, and the previous object.
+
+
             total_numsteps += 1
             episode_reward += reward
 
@@ -485,19 +496,6 @@ def train_ddpg(env, n_agents, device):
             notdone = torch.Tensor([not done]).to(device)
             next_state = torch.Tensor([next_state]).to(device)
             reward = torch.Tensor([reward]).to(device)
-
-            # memory needs to store:
-            # 0) just the current x value: x_t
-            # 1) delayed x values x_t, x_t-1,..., x_t-k
-            # 2) current GSO: I, A_t, A_t^2... A_t^k
-            # 3) delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
-
-            # OK, but what to do about the next state? Maybe make a named tuple for state that has all of these friends
-            # in it, so that I don't have to duplicate data... or will it be duplicated regardless?
-            # Maybe a MultiAgentStateWithDelay object to store these wonderful matrices?
-
-            # for delayed info, https://docs.scipy.org/doc/scipy/reference/generated/scipy.ndimage.shift.html
-            # but how to do this in-place efficiently?
 
             memory.insert(Transition(state, action, notdone, next_state, reward))
 
