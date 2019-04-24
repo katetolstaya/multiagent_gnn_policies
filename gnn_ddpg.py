@@ -327,8 +327,8 @@ class DDPG(object):
         self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-6)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-5)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-7)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-6)
 
         # Constants
         self.gamma = gamma
@@ -505,7 +505,7 @@ def train_ddpg(env, args, device):
     total_numsteps = 0
     updates = 0
 
-    n_episodes = 250
+    n_episodes = 10000
 
     for i in range(n_episodes):
         ounoise.reset()
