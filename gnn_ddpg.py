@@ -22,10 +22,10 @@ parser.add_argument('--n_agents', type=int, default=15, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=3, help='k')
-parser.add_argument('--hidden_size', type=int, default=32, help='hidden_size')
+parser.add_argument('--hidden_size', type=int, default=16, help='hidden_size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=2, help='random_seed')
+parser.add_argument('--seed', type=int, default=3, help='random_seed')
 
 args = parser.parse_args()
 
@@ -335,8 +335,8 @@ class DDPG(object):
         self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-6)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-5)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-7)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-6)
 
         # Constants
         self.gamma = gamma
