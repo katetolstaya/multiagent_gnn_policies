@@ -25,7 +25,7 @@ parser.add_argument('--k', type=int, default=3, help='k')
 parser.add_argument('--hidden_size', type=int, default=32, help='hidden_size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=1, help='random_seed')
+parser.add_argument('--seed', type=int, default=2, help='random_seed')
 
 args = parser.parse_args()
 
@@ -187,6 +187,12 @@ class Actor(nn.Module):
 
             self.conv_layers.append(m)
 
+        # layer_norms = []
+        # for i in range(0, self.n_layers):
+        #     ln = nn.LayerNorm(self.hidden_size)
+        #     layer_norms.append(ln)
+
+
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
     def forward(self, delay_state, delay_gso):
@@ -224,6 +230,8 @@ class Actor(nn.Module):
 
         x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
 
+        x = x.clamp(-1, 1)  # TODO these limits depend on the MDP
+
         return x
 
 
@@ -233,7 +241,7 @@ class OUNoise:
     control problems with inertia. See https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
     """
 
-    def __init__(self, n_a, n_agents, scale=0.3, mu=0, theta=0.15, sigma=0.2):  # TODO change default params
+    def __init__(self, n_a, n_agents, scale=0.5, mu=0, theta=0.15, sigma=0.2):  # TODO change default params
         """
         Initialize the Noise parameters.
         :param n_a: Size of the Action space.
@@ -327,8 +335,8 @@ class DDPG(object):
         self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-7)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-6)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-6)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-5)
 
         # Constants
         self.gamma = gamma
@@ -360,7 +368,7 @@ class DDPG(object):
         if action_noise is not None:  # Add noise if provided.
             mu += torch.Tensor(action_noise.noise()).to(self.device)
 
-        return mu  # mu.clamp(-1, 1) # TODO clamp action to what space?
+        return mu.clamp(-1, 1)  # TODO clamp action to what space?
 
     def gradient_step(self, batch):
         """
