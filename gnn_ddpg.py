@@ -19,11 +19,18 @@ parser.add_argument('--batch_size', type=int, default=40, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
 parser.add_argument('--n_agents', type=int, default=100, help='n_agents')
+parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
+parser.add_argument('--n_states', type=int, default=6, help='n_states')
+parser.add_argument('--k', type=int, default=3, help='k')
+parser.add_argument('--hidden_size', type=int, default=32, help='hidden_size')
+parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
+parser.add_argument('--tau', type=float, default=0.5, help='tau')
+parser.add_argument('--seed', type=int, default=1, help='random_seed')
 
 args = parser.parse_args()
 
-Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 'reward', 'gso', 'next_gso'))
-
+Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 'reward'))
+Parameters = namedtuple('Parameters', ('n_states', 'n_actions', 'n_agents', 'k', 'device', 'hidden_size', 'gamma', 'tau'))
 
 # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
@@ -282,13 +289,22 @@ class DDPG(object):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - tau) + tau * param.data)
 
-    def __init__(self, n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
+    def __init__(self, params): #, n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
         """
         Initialize the DDPG networks.
         :param n_s: Size of state space.
         :param n_a: Size of action space.
         :param hidden_size: Size of hidden layers.
         """
+
+        n_s = params.n_states
+        n_a = params.n_actions
+        k = params.k
+        device = params.device
+        hidden_size = params.hidden_size
+        gamma = params.gamma
+        tau = params.tau
+
         # Device
         self.device = device
 
@@ -338,8 +354,10 @@ class DDPG(object):
         :param batch: The batch of training samples.
         :return: The loss function in the network.
         """
-        # TODO
+
         # Collect Batch Data
+
+        # TODO use MultiAgentStateWithDelay object to prepare data for delayed data for Actor, current data for Critic
         gso_batch = Variable(torch.cat(batch.gso)).to(self.device)
         next_gso_batch = Variable(torch.cat(batch.next_gso)).to(self.device)
 
@@ -417,31 +435,48 @@ class MultiAgentStateWithDelay(object):
 
     # TODO n_s, n_a, n_agents, k, are shared parameters
 
-    # TODO the arrays in this object should be tensors on the GPU
+    # TODO - where to convert numpy -> torch GPU tensors?
+    # TODO - where to resize arrays?
 
     # xt, gso, prev_state not shared
-    def __init__(self, n_s, n_a, n_agents, k, st, network, prev_state=None):
+    def __init__(self, params, env_state, prev_state=None):
         """
         Do not need the delayed actions. This object only stores state & GSO information
         :param n_s:
         :param n_a:
         :param n_agents:
         :param k:
-        :param st:
+        :param env_state:
         :param network:
         :param prev_state:
         """
-        # 0) just the current state value: x_t
-        # 1) delayed x values x_t, x_t-1,..., x_t-k
-        # 2) current GSO: I, A_t, A_t^2... A_t^k
-        # 3) delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
 
-        f = 0 # TODO num features - get from dimension of state
+        # TODO: focus on the difference (S) and (S,A)
 
-        self.st = st
+        n_agents = params.n_agents
+        k = params.k
+        device = params.device
+        f = params.n_states  # is this right? different for policy and actor actually
+
+        #TODO - all of the below:
+        # 1) Split up the state tuple
+
+        state_values, state_network = env_state
+
+        #2) Reshape to correct size
+
+        #3) Move to GPU
+        self.st = torch.Tensor([env_state[0]]).to(device)
+        network = torch.Tensor([env_state[1]])
+        # TODO remove network self loops and normalize
+
+        #4) Compute current GSO - powers of the network matrix: current GSO: I, A_t, A_t^2... A_t^k
+
         self.curr_gso = np.zeros((1, k, n_agents, n_agents))
 
-        # TODO remove network self loops and normalize
+        #4) Update delayed_GSO and delayed_x
+        # 1) delayed x values x_t, x_t-1,..., x_t-k
+        # 3) delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
 
         if prev_state is None:
             self.delayed_x = np.zeros((1, k, f, n_agents))
@@ -458,11 +493,11 @@ class MultiAgentStateWithDelay(object):
 
 
 # TODO this function and then adjust the env to return state = (values, network)
-def train_ddpg(env, n_agents, device):
+def train_ddpg(env, params):
 
     memory = ReplayBuffer(max_size=args.buffer_size)
-    ounoise = OUNoise(env.action_space.shape[0], n_agents, scale=1)
-    learner = DDPG(env.observation_space.shape[0], env.action_space.shape[0], K, device=device)
+    ounoise = OUNoise(params.n_actions, params.n_agents, scale=1)
+    learner = DDPG(params)
 
     rewards = []
     total_numsteps = 0
@@ -473,30 +508,22 @@ def train_ddpg(env, n_agents, device):
     for i in range(n_episodes):
         ounoise.reset()
 
-        env_state = env.reset()  # a tuple (values, network)
-
-        state = torch.Tensor([env_state[0]]).to(device)
-        network = torch.Tensor([env_state[1]])
-
-        # TODO initialize object, with prev_state as None
+        state = MultiAgentStateWithDelay(params, env.reset(), prev_state=None)
 
         episode_reward = 0
         done = False
         while not done:
             action = learner.select_action(state, ounoise)
             next_state, reward, done, _ = env.step(action.cpu().numpy()[0])
-            # next state is actually the state values and the current GSO
-            # TODO make the delayed state object from this new state, and the previous object.
 
+            next_state = MultiAgentStateWithDelay(params, next_state, prev_state=state)
 
             total_numsteps += 1
             episode_reward += reward
 
             # action = torch.Tensor(action)
             notdone = torch.Tensor([not done]).to(device)
-            next_state = torch.Tensor([next_state]).to(device)
             reward = torch.Tensor([reward]).to(device)
-
             memory.insert(Transition(state, action, notdone, next_state, reward))
 
             state = next_state
@@ -510,15 +537,14 @@ def train_ddpg(env, n_agents, device):
 
         rewards.append(episode_reward)
         if i % 10 == 0:
-            state = torch.Tensor([env.reset()]).to(device)
+            #state = torch.Tensor([env.reset()]).to(device)
+            state = MultiAgentStateWithDelay(params, env.reset(), prev_state=None)
             episode_reward = 0
             while True:
                 action = learner.select_action(state)
-
                 next_state, reward, done, _ = env.step(action.cpu().numpy()[0])
+                next_state = MultiAgentStateWithDelay(params, env.reset(), prev_state=state)
                 episode_reward += reward
-                next_state = torch.Tensor([next_state]).to(device)
-
                 state = next_state
                 if done:
                     break
@@ -535,10 +561,17 @@ def train_ddpg(env, n_agents, device):
 
 
 if __name__ == "__main__":
+    # initialize gym env
     env = gym.make(args.env)
-    env.seed(1)
-    random.seed(1)
-    np.random.seed(1)
-    torch.manual_seed(1)
+
+    # use seed
+    env.seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+
+    # initialize params tuple
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train_ddpg(env, args.n_agents, device)
+    params = Parameters(args.n_states, args.n_actions, args.n_agents, args.k, device, args.hidden_size, args.gamma, args.tau)
+
+    train_ddpg(env, params)
