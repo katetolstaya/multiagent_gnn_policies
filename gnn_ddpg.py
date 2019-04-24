@@ -18,7 +18,7 @@ parser.add_argument('--env', type=str, default="Flocking-v0", help='Gym environm
 parser.add_argument('--batch_size', type=int, default=40, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
-parser.add_argument('--n_agents', type=int, default=15, help='n_agents')
+parser.add_argument('--n_agents', type=int, default=50, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=3, help='k')
