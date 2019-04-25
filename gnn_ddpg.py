@@ -18,14 +18,14 @@ parser.add_argument('--env', type=str, default="Flocking-v0", help='Gym environm
 parser.add_argument('--batch_size', type=int, default=40, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
-parser.add_argument('--n_agents', type=int, default=15, help='n_agents')
+parser.add_argument('--n_agents', type=int, default=50, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=3, help='k')
 parser.add_argument('--hidden_size', type=int, default=16, help='hidden_size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=3, help='random_seed')
+parser.add_argument('--seed', type=int, default=5, help='random_seed')
 
 args = parser.parse_args()
 
@@ -42,6 +42,7 @@ class ReplayBuffer(object):
         self.buffer = []
         self.max_size = max_size
         self.curr_size = 0
+        self.position = 0
 
     def insert(self, sample):
         """
@@ -49,19 +50,20 @@ class ReplayBuffer(object):
         :param sample: The (S,A,R,S) tuple.
         :return: None
         """
-        if self.curr_size == self.max_size:
-            self.buffer.pop(0)
-        else:
-            self.curr_size += 1
-        self.buffer.append(sample)
+        if self.curr_size < self.max_size:
+            self.buffer.append(None)
+            self.curr_size = self.curr_size + 1
 
-    def sample(self, num):
+        self.buffer[self.position] = Transition(*sample)
+        self.position = (self.position + 1) % self.max_size
+
+    def sample(self, num_samples):
         """
         Sample a number of transitions from the replay buffer.
-        :param num: Number of transitions to sample.
+        :param num_samples: Number of transitions to sample.
         :return: The set of sampled transitions.
         """
-        return random.sample(self.buffer, num)
+        return random.sample(self.buffer, num_samples)
 
     def clear(self):
         """
@@ -70,6 +72,7 @@ class ReplayBuffer(object):
         """
         self.buffer = []
         self.curr_size = 0
+        self.position = 0
 
 
 class Critic(nn.Module):
@@ -184,12 +187,6 @@ class Actor(nn.Module):
 
             self.conv_layers.append(m)
 
-        # layer_norms = []
-        # for i in range(0, self.n_layers):
-        #     ln = nn.LayerNorm(self.hidden_size)
-        #     layer_norms.append(ln)
-
-
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
     def forward(self, delay_state, delay_gso):
@@ -238,7 +235,7 @@ class OUNoise:
     control problems with inertia. See https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
     """
 
-    def __init__(self, n_a, n_agents, scale=0.5, mu=0, theta=0.15, sigma=0.2):  # TODO change default params
+    def __init__(self, n_a, n_agents, scale=0.5, mu=0, theta=0.5, sigma=0.5):  # TODO change default params
         """
         Initialize the Noise parameters.
         :param n_a: Size of the Action space.
@@ -303,9 +300,8 @@ class DDPG(object):
     def __init__(self, device, args):  # , n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
         """
         Initialize the DDPG networks.
-        :param n_s: Size of state space.
-        :param n_a: Size of action space.
-        :param hidden_size: Size of hidden layers.
+        :param device: CUDA device for torch
+        :param args: experiment arguments
         """
 
         n_s = args.n_states
@@ -332,8 +328,8 @@ class DDPG(object):
         self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-7)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-6)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-5)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-4)
 
         # Constants
         self.gamma = gamma
@@ -470,7 +466,7 @@ class MultiAgentStateWithDelay(object):
 
         assert state_value.shape == (n_agents, n_states)
         assert state_network.shape == (n_agents, n_agents)
-        assert np.sum(np.diag(state_network)) == 0  # assume no self loops
+        #assert np.sum(np.diag(state_network)) == 0  # assume no self loops
 
         # reshape values and network to correct shape
         state_value = state_value.transpose(1, 0)
@@ -521,7 +517,7 @@ def train_ddpg(env, args, device):
         done = False
         while not done:
             action = learner.select_action(state, ounoise)
-            next_state, reward, done, _ = env.step(action.cpu().numpy()[0])
+            next_state, reward, done, _ = env.step(action.cpu().numpy())
 
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
 
@@ -557,7 +553,7 @@ def train_ddpg(env, args, device):
             done = False
             while not done:
                 action = learner.select_action(state)
-                next_state, reward, done, _ = env.step(action.cpu().numpy()[0])
+                next_state, reward, done, _ = env.step(action.cpu().numpy())
                 next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                 episode_reward += reward
                 state = next_state
