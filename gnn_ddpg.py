@@ -14,18 +14,18 @@ from torch.autograd import Variable
 
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
-parser.add_argument('--env', type=str, default="Flocking-v0", help='Gym environment to run')
+parser.add_argument('--env', type=str, default="FlockingTest-v0", help='Gym environment to run')
 parser.add_argument('--batch_size', type=int, default=40, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
-parser.add_argument('--n_agents', type=int, default=50, help='n_agents')
+parser.add_argument('--n_agents', type=int, default=20, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=3, help='k')
-parser.add_argument('--hidden_size', type=int, default=16, help='hidden_size')
+parser.add_argument('--hidden_size', type=int, default=64, help='hidden_size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=5, help='random_seed')
+parser.add_argument('--seed', type=int, default=7, help='random_seed')
 
 args = parser.parse_args()
 
@@ -33,12 +33,17 @@ Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 
 
 # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
+
 class ReplayBuffer(object):
     """
     Stores training samples for RL algorithms, represented as tuples of (S, A, R, S).
     """
 
     def __init__(self, max_size=1000):
+        """
+        Initialize the replay buffer object. Once the buffer is full, remove the oldest sample.
+        :param max_size: maximum size of the buffer.
+        """
         self.buffer = []
         self.max_size = max_size
         self.curr_size = 0
@@ -99,7 +104,7 @@ class Critic(nn.Module):
 
         for i in range(self.n_layers):
 
-            if i > 0 or self.gso_first:
+            if i > 0 or self.gso_first:  # After GSO is applied, the data has shape[1]=K channels
                 in_channels = k
             else:
                 in_channels = 1
@@ -108,6 +113,13 @@ class Critic(nn.Module):
                           stride=(self.layers[i], 1))
             self.conv_layers.append(m)
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
+
+        self.layer_norms = []
+        for i in range(self.n_layers-1):
+            m = nn.GroupNorm(self.layers[i+1], self.layers[i+1])
+            self.layer_norms.append(m)
+
+        self.layer_norms = torch.nn.ModuleList(self.layer_norms)
 
     def forward(self, states, actions, gso):
         """
@@ -118,6 +130,7 @@ class Critic(nn.Module):
         :return:
         """
 
+        # check input size, which is critical for correct GSO application
         batch_size = np.shape(states)[0]
         n_agents = states.shape[3]
 
@@ -143,6 +156,7 @@ class Critic(nn.Module):
             x = self.conv_layers[i](x)  # Linear layer
 
             if i < self.n_layers - 1:  # last layer needs no relu()
+                x = self.layer_norms[i](x)
                 x = F.relu(x)
 
             x = x.view((batch_size, 1, self.layers[i + 1], n_agents))
@@ -189,6 +203,12 @@ class Actor(nn.Module):
 
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
+        # self.layer_norms = []
+        # for i in range(self.n_layers-1):
+        #     m = nn.GroupNorm(self.layers[i+1], self.layers[i+1])
+        #     self.layer_norms.append(m)
+        # self.layer_norms = torch.nn.ModuleList(self.layer_norms)
+
     def forward(self, delay_state, delay_gso):
         """
         The policy relies on delayed information from neighbors. During training, the full history for k time steps is
@@ -220,6 +240,7 @@ class Actor(nn.Module):
             x = self.conv_layers[i](x)  # now (B,G,1,N)
 
             if i < self.n_layers - 1:  # last layer - no relu
+                #x = self.layer_norms[i](x)
                 x = F.relu(x)
 
         x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
@@ -328,7 +349,7 @@ class DDPG(object):
         self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-5)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-6)
         self.critic_optim = Adam(self.critic.parameters(), lr=1e-4)
 
         # Constants
@@ -339,7 +360,6 @@ class DDPG(object):
         DDPG.hard_update(self.actor_target, self.actor)
         DDPG.hard_update(self.critic_target, self.critic)
 
-    # TODO convert delay object to two tensors
     def select_action(self, state, action_noise=None):
         """
         Evaluate the Actor network over the given state, and with injection of noise.
@@ -374,7 +394,6 @@ class DDPG(object):
         # use MultiAgentStateWithDelay object to prepare data:
         # for Critic - current centralized data
         # for Actor - delayed decentralized data
-
 
         delay_gso_batch = Variable(torch.cat(tuple([s.delay_gso for s in batch.state]))).to(self.device)
         gso_batch = Variable(torch.cat(tuple([s.curr_gso for s in batch.state]))).to(self.device)
@@ -456,7 +475,13 @@ class DDPG(object):
 class MultiAgentStateWithDelay(object):
 
     def __init__(self, device, args, env_state, prev_state=None):
-
+        """
+        Create the state object that keeps track of the current state and GSO and history information
+        :param device: CUDA device to use with PyTorch
+        :param args:
+        :param env_state:
+        :param prev_state:
+        """
         n_states = args.n_states
         n_agents = args.n_agents
         k = args.k
@@ -466,7 +491,7 @@ class MultiAgentStateWithDelay(object):
 
         assert state_value.shape == (n_agents, n_states)
         assert state_network.shape == (n_agents, n_agents)
-        #assert np.sum(np.diag(state_network)) == 0  # assume no self loops
+        assert np.sum(np.diag(state_network)) == 0  # assume no self loops
 
         # reshape values and network to correct shape
         state_value = state_value.transpose(1, 0)
@@ -496,7 +521,6 @@ class MultiAgentStateWithDelay(object):
             self.delay_state[0, 1:k, :, :] = prev_state.delay_state[0, 0:k - 1, :, :]
 
 
-# TODO this function and then adjust the env to return state = (values, network)
 def train_ddpg(env, args, device):
     memory = ReplayBuffer(max_size=args.buffer_size)
     ounoise = OUNoise(args.n_actions, args.n_agents, scale=1)

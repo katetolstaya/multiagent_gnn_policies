@@ -1,29 +1,21 @@
 import argparse
-import math
-from collections import namedtuple
-from itertools import count
-from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
 import gym
 import numpy as np
-from gym import wrappers
-import gym_flock
 
 import torch
 from ddpg import DDPG
-from naf import NAF
 from normalized_actions import NormalizedActions
 from ounoise import OUNoise
-from param_noise import AdaptiveParamNoiseSpec, ddpg_distance_metric
-from replay_memory import ReplayMemory, Transition
-
+from old.param_noise import AdaptiveParamNoiseSpec
+from replay_memory import ReplayMemory
 
 parser = argparse.ArgumentParser(description='PyTorch REINFORCE example')
-parser.add_argument('--env-name', default="Flocking-v0",
-                    help='name of the environment to run')
-parser.add_argument('--algo', default='DDPG',
-                    help='algorithm to use: DDPG | NAF')
+# parser.add_argument('--env-name', default="LQR-v0",
+#                     help='name of the environment to run')
+# parser.add_argument('--algo', default='NAF',
+#                     help='algorithm to use: DDPG | NAF')
 parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
                     help='discount factor for reward (default: 0.99)')
 parser.add_argument('--tau', type=float, default=0.001, metavar='G',
@@ -55,18 +47,22 @@ args = parser.parse_args()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cpu")
 
-env = NormalizedActions(gym.make(args.env_name))
+
+env_name = 'Flocking-v0'
+suffix = 900
+actor_path = "models/ddpg_actor_{}_{}".format(env_name, suffix) 
+critic_path = "models/ddpg_critic_{}_{}".format(env_name, suffix) 
+
+env = NormalizedActions(gym.make(env_name))
 writer = SummaryWriter()
 
 env.seed(args.seed)
 torch.manual_seed(args.seed)
 np.random.seed(args.seed)
-if args.algo == "NAF":
-    agent = NAF(args.gamma, args.tau, args.hidden_size,
+agent = DDPG(args.gamma, args.tau, args.hidden_size,
                       env.observation_space.shape[0], env.action_space, device)
-else:
-    agent = DDPG(args.gamma, args.tau, args.hidden_size,
-                      env.observation_space.shape[0], env.action_space, device)
+
+agent.load_model(actor_path, critic_path)
 
 memory = ReplayMemory(args.replay_size)
 
@@ -97,61 +93,6 @@ for i_episode in range(args.num_episodes):
 
     episode_reward = 0
     while True:
-
-        for n in range(n_agents):
-            arr_agent_state = state[n,:].flatten()
-            agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
-            agent_action = agent.select_action(agent_state, ounoise, param_noise)
-            action[n, :] = agent_action.cpu().numpy()
-
-        (amax, next_state), reward, done, _ = env.step(action)
-        total_numsteps += 1
-        episode_reward += reward
-        mask = torch.Tensor([not done])
-        reward = torch.Tensor([reward])
-
-        agent_action = torch.Tensor([action[amax,:].flatten()]).to(device)
-        agent_next_state = torch.Tensor([next_state[amax,:].flatten()]).to(device)
-        agent_state = torch.Tensor([state[amax,:].flatten()]).to(device)
-        memory.push(agent_state, agent_action, mask, agent_next_state, reward)
-
-        # for n in range(n_agents):
-        #     agent_action = torch.Tensor([action[n,:].flatten()]).to(device)
-        #     agent_next_state = torch.Tensor([next_state[n,:].flatten()]).to(device)
-        #     agent_state = torch.Tensor([state[n,:].flatten()]).to(device)
-        #     memory.push(agent_state, agent_action, mask, agent_next_state, reward)
-
-
-        state = next_state
-
-        if len(memory) > args.batch_size:
-            for _ in range(args.updates_per_step):
-                transitions = memory.sample(args.batch_size)
-                batch = Transition(*zip(*transitions))
-
-                value_loss, policy_loss = agent.update_parameters(batch)
-
-                writer.add_scalar('loss/value', value_loss, updates)
-                writer.add_scalar('loss/policy', policy_loss, updates)
-
-                updates += 1
-        if done:
-            break
-
-    writer.add_scalar('reward/train', episode_reward, i_episode)
-
-    # Update param_noise based on distance metric
-    if args.param_noise:
-        episode_transitions = memory.memory[memory.position-t:memory.position]
-        states = torch.cat([transition[0] for transition in episode_transitions], 0).to(device)
-        unperturbed_actions = agent.select_action(states, None, None)
-        perturbed_actions = torch.cat([transition[1] for transition in episode_transitions], 0)
-
-        ddpg_dist = ddpg_distance_metric(perturbed_actions.cpu().numpy(), unperturbed_actions.cpu().numpy())
-        param_noise.adapt(ddpg_dist)
-
-    rewards.append(episode_reward)
-    if i_episode % 10 == 0:
         state = env.reset() #torch.Tensor([env.reset()]) # TODO
         episode_reward = 0
         while True:
@@ -161,18 +102,15 @@ for i_episode in range(args.num_episodes):
                 action[n, :] = agent_action.cpu().numpy()
             #action = agent.select_action(state)
 
-            (amax, next_state), reward, done, _ = env.step(action) # TODO
+            next_state, reward, done, _ = env.step(action) # TODO
             episode_reward += reward
 
             state = next_state
+            env.render()
             if done:
                 break
 
-        writer.add_scalar('reward/test', episode_reward, i_episode)
-
         rewards.append(episode_reward)
         print("Episode: {}, total numsteps: {}, reward: {}, average reward: {}".format(i_episode, total_numsteps, rewards[-1], np.mean(rewards[-10:])))
-    if i_episode % 50 == 0:       
-        agent.save_model(args.env_name, suffix=str(i_episode))
 
 env.close()
