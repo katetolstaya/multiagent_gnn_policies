@@ -15,17 +15,18 @@ from torch.autograd import Variable
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
-parser.add_argument('--batch_size', type=int, default=40, help='Batch size')
+parser.add_argument('--batch_size', type=int, default=100, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
 parser.add_argument('--n_agents', type=int, default=20, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=3, help='k')
-parser.add_argument('--hidden_size', type=int, default=16, help='hidden_size')
+parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
 parser.add_argument('--seed', type=int, default=7, help='random_seed')
+parser.add_argument('--actor_lr', type=float, default=1e-4, help='learning rate for actor')
 
 args = parser.parse_args()
 
@@ -117,11 +118,6 @@ class Actor(nn.Module):
 
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
-        # self.layer_norms = []
-        # for i in range(self.n_layers-1):
-        #     m = nn.GroupNorm(self.layers[i+1], self.layers[i+1])
-        #     self.layer_norms.append(m)
-        # self.layer_norms = torch.nn.ModuleList(self.layer_norms)
 
     def forward(self, delay_state, delay_gso):
         """
@@ -155,82 +151,16 @@ class Actor(nn.Module):
 
             if i < self.n_layers - 1:  # last layer - no relu
                 #x = self.layer_norms[i](x)
-                x = F.relu(x)
+                x = torch.tanh(x) #F.relu(x)
 
         x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
 
-        x = x.clamp(-1, 1)  # TODO these limits depend on the MDP
+        #x = x.clamp(-1, 1)  # TODO these limits depend on the MDP
 
         return x
 
 
-class OUNoise:
-    """
-    Generates noise from an Ornstein Uhlenbeck process, for temporally correlated exploration. Useful for physical
-    control problems with inertia. See https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
-    """
-
-    def __init__(self, n_a, n_agents, scale=0.5, mu=0, theta=0.5, sigma=0.5):  # TODO change default params
-        """
-        Initialize the Noise parameters.
-        :param n_a: Size of the Action space.
-        :param n_agents: Number of agents.
-        :param scale: Scale of the noise process.
-        :param mu: The mean of the noise.
-        :param theta: Inertial term for drift..
-        :param sigma: Standard deviation of noise.
-        """
-        self.nA = n_a
-        self.n_agents = n_agents
-        self.scale = scale
-        self.mu = mu
-        self.theta = theta
-        self.sigma = sigma
-        self.state = np.ones((self.n_agents, self.nA)) * self.mu
-        self.reset()
-
-    def reset(self):
-        """
-        Reset the noise process.
-        :return:
-        """
-        self.state = np.ones((self.n_agents, self.nA)) * self.mu
-
-    def noise(self):
-        """
-        Compute the next noise value.
-        :return: The noise value.
-        """
-        x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * np.random.standard_normal(np.shape(x))
-        self.state = x + dx
-        return self.state * self.scale
-
-
 class ImitationLearning(object):
-
-    @staticmethod
-    def hard_update(target, source):
-        """
-        Copy parameters from source to target.
-        :param target: Target network.
-        :param source: Source network.
-        :return:
-        """
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(param.data)
-
-    @staticmethod
-    def soft_update(target, source, tau):
-        """
-        Soft update parameters from source to target according to parameter Tau.
-        :param target: Target network.
-        :param source: Source network.
-        :param tau: Weight of the update.
-        :return: None
-        """
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(target_param.data * (1.0 - tau) + tau * param.data)
 
     def __init__(self, device, args):  # , n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
         """
@@ -254,25 +184,20 @@ class ImitationLearning(object):
         self.device = device
 
         hidden_layers = [hidden_size, hidden_size]
-        ind_agg = 0 #int(len(hidden_layers) / 2)  # aggregate halfway
+        ind_agg = 1  # int(len(hidden_layers) / 2)  # aggregate halfway
 
         # Define Networks
         self.actor = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
-        #self.actor_target = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
-
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-7)
+        self.actor_optim = Adam(self.actor.parameters(), lr=args.actor_lr)
 
         # Constants
         self.gamma = gamma
         self.tau = tau
 
-        # Initialize Target Networks
-        #ImitationLearning.hard_update(self.actor_target, self.actor)
 
-
-    def select_action(self, state, action_noise=None):
+    def select_action(self, state):
         """
         Evaluate the Actor network over the given state, and with injection of noise.
         :param state: The current state.
@@ -289,11 +214,9 @@ class ImitationLearning(object):
 
         self.actor.train()  # Switch back to Train mode.
         mu = mu.data
+        return mu
 
-        if action_noise is not None:  # Add noise if provided.
-            mu += torch.Tensor(action_noise.noise()).to(self.device)
-
-        return mu.clamp(-1, 1)  # TODO clamp action to what space?
+        #return mu.clamp(-1, 1)  # TODO clamp action to what space?
 
     def gradient_step(self, batch):
         """
@@ -301,15 +224,6 @@ class ImitationLearning(object):
         :param batch: The batch of training samples.
         :return: The loss function in the network.
         """
-
-        # Collect Batch Data
-        # use MultiAgentStateWithDelay object to prepare data:
-        # for Actor - delayed decentralized data
-
-        # state_batch = Variable(torch.cat(tuple([s.values for s in batch.state]))).to(self.device)
-        # gso_batch = Variable(torch.cat(tuple([s.curr_gso for s in batch.state]))).to(self.device)
-        # reward_batch = Variable(torch.cat(batch.reward)).unsqueeze(1).to(self.device)
-        # done_batch = Variable(torch.cat(batch.done)).unsqueeze(1).to(self.device)
 
         delay_gso_batch = Variable(torch.cat(tuple([s.delay_gso for s in batch.state]))).to(self.device)
         delay_state_batch = Variable(torch.cat(tuple([s.delay_state for s in batch.state]))).to(self.device)
@@ -323,9 +237,6 @@ class ImitationLearning(object):
         policy_loss.backward()
         self.actor_optim.step()
         # End Optimize Actor
-
-        # Write parameters to Target networks.
-        #ImitationLearning.soft_update(self.actor_target, self.actor, self.tau)
 
         return policy_loss.item()
 
@@ -342,7 +253,7 @@ class ImitationLearning(object):
 
         if actor_path is None:
             actor_path = "models/ddpg_actor_{}_{}".format(env_name, suffix)
-        print('Saving models to {} and {}'.format(actor_path))
+        print('Saving model to {}'.format(actor_path))
         torch.save(self.actor.state_dict(), actor_path)
 
 
@@ -408,7 +319,6 @@ class MultiAgentStateWithDelay(object):
 
 def train_ddpg(env, args, device):
     memory = ReplayBuffer(max_size=args.buffer_size)
-    #ounoise = OUNoise(args.n_actions, args.n_agents, scale=1)
     learner = ImitationLearning(device, args)
 
     rewards = []
@@ -418,7 +328,6 @@ def train_ddpg(env, args, device):
     n_episodes = 10000
 
     for i in range(n_episodes):
-        #ounoise.reset()
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
@@ -426,7 +335,7 @@ def train_ddpg(env, args, device):
         done = False
         while not done:
 
-            # action = learner.select_action(state, ounoise)
+            # action = learner.select_action(state)
             optimal_action = env.env.controller()
             # next_state, reward, done, _ = env.step(action.cpu().numpy())
             next_state, reward, done, _ = env.step(optimal_action)
