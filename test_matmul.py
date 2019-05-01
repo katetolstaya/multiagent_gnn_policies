@@ -16,7 +16,7 @@ K = 3 # num aggregations
 hidden_layers = [7,6,5,4]
 
 # apply the GSO - done
-inp = torch.ones((B,1,F,N)) # batch x features x agents
+inp = torch.ones((B,1,F,N,N)) # batch x features x agents
 GSO = torch.ones((B,K,N,N)) # a different KxNxN GSO for each state in the batch
 
 for i in range(len(hidden_layers)-1):

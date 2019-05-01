@@ -22,7 +22,7 @@ parser.add_argument('--n_agents', type=int, default=20, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=3, help='k')
-parser.add_argument('--hidden_size', type=int, default=64, help='hidden_size')
+parser.add_argument('--hidden_size', type=int, default=16, help='hidden_size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
 parser.add_argument('--seed', type=int, default=7, help='random_seed')
@@ -78,92 +78,6 @@ class ReplayBuffer(object):
         self.buffer = []
         self.curr_size = 0
         self.position = 0
-
-
-class Critic(nn.Module):
-
-    def __init__(self, n_s, n_a, hidden_layers, k):
-        """
-        The actor network is centralized, so it can have any number of [GSO -> Linearity -> Activation] layers
-        If there's a lot of layers here, it doesn't matter if we have a non-linearity or GSO first (test this).
-        :param n_s: number of MDP states per agent
-        :param n_a: number of MDP actions per agent
-        :param hidden_layers: list of ints that will determine the width of each hidden layer
-        :param k: aggregation filter length
-        """
-        super(Critic, self).__init__()
-
-        self.k = k
-        self.n_s = n_s
-        self.n_a = n_a
-
-        self.layers = [self.n_s + self.n_a] + hidden_layers + [1]
-        self.n_layers = len(self.layers) - 1
-        self.conv_layers = []
-        self.gso_first = True
-
-        for i in range(self.n_layers):
-
-            if i > 0 or self.gso_first:  # After GSO is applied, the data has shape[1]=K channels
-                in_channels = k
-            else:
-                in_channels = 1
-
-            m = nn.Conv2d(in_channels=in_channels, out_channels=self.layers[i + 1], kernel_size=(self.layers[i], 1),
-                          stride=(self.layers[i], 1))
-            self.conv_layers.append(m)
-        self.conv_layers = torch.nn.ModuleList(self.conv_layers)
-
-        self.layer_norms = []
-        for i in range(self.n_layers-1):
-            m = nn.GroupNorm(self.layers[i+1], self.layers[i+1])
-            self.layer_norms.append(m)
-
-        self.layer_norms = torch.nn.ModuleList(self.layer_norms)
-
-    def forward(self, states, actions, gso):
-        """
-        Evaluate the critic network
-        :param states: Current states of shape (B,1,n_s,N), where B = # batches, n_s = # features, N = # agents
-        :param actions: Current actions of shape (B,1,n_a,N), where B = # batches, n_a = # features, N = # agents
-        :param gso: Current GSO = [I, A_t, A_t^2,..., A_t^K-1] of shape (B,K,N,N)
-        :return:
-        """
-
-        # check input size, which is critical for correct GSO application
-        batch_size = np.shape(states)[0]
-        n_agents = states.shape[3]
-
-        assert batch_size == actions.shape[0]
-        assert batch_size == gso.shape[0]
-        assert states.shape[1] == 1
-        assert actions.shape[2] == self.n_a
-        assert actions.shape[3] == n_agents
-        assert states.shape[2] == self.n_s
-
-        assert gso.shape[1] == self.k
-        assert gso.shape[2] == n_agents
-        assert gso.shape[3] == n_agents
-
-        x = torch.cat((states, actions), 2)
-
-        # GSO -> Linearity -> Activation
-        for i in range(self.n_layers):
-
-            if i > 0 or self.gso_first:
-                x = torch.matmul(x, gso)  # GSO
-
-            x = self.conv_layers[i](x)  # Linear layer
-
-            if i < self.n_layers - 1:  # last layer needs no relu()
-                x = self.layer_norms[i](x)
-                x = F.relu(x)
-
-            x = x.view((batch_size, 1, self.layers[i + 1], n_agents))
-
-        x = x.view((batch_size, 1, n_agents))  # now size (B, 1, N)
-
-        return x  # size of x here is batch_size x output_layer x 1 x n_agents
 
 
 class Actor(nn.Module):
@@ -293,7 +207,7 @@ class OUNoise:
         return self.state * self.scale
 
 
-class DDPG(object):
+class ImitationLearning(object):
 
     @staticmethod
     def hard_update(target, source):
@@ -340,25 +254,23 @@ class DDPG(object):
         self.device = device
 
         hidden_layers = [hidden_size, hidden_size]
-        ind_agg = int(len(hidden_layers) / 2)  # aggregate halfway
+        ind_agg = 0 #int(len(hidden_layers) / 2)  # aggregate halfway
 
         # Define Networks
         self.actor = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
-        self.actor_target = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
-        self.critic = Critic(n_s, n_a, hidden_layers, k).to(self.device)
-        self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
+        #self.actor_target = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
+
 
         # Define Optimizers
         self.actor_optim = Adam(self.actor.parameters(), lr=1e-7)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-5)
 
         # Constants
         self.gamma = gamma
         self.tau = tau
 
         # Initialize Target Networks
-        DDPG.hard_update(self.actor_target, self.actor)
-        DDPG.hard_update(self.critic_target, self.critic)
+        #ImitationLearning.hard_update(self.actor_target, self.actor)
+
 
     def select_action(self, state, action_noise=None):
         """
@@ -392,59 +304,37 @@ class DDPG(object):
 
         # Collect Batch Data
         # use MultiAgentStateWithDelay object to prepare data:
-        # for Critic - current centralized data
         # for Actor - delayed decentralized data
 
+        # state_batch = Variable(torch.cat(tuple([s.values for s in batch.state]))).to(self.device)
+        # gso_batch = Variable(torch.cat(tuple([s.curr_gso for s in batch.state]))).to(self.device)
+        # reward_batch = Variable(torch.cat(batch.reward)).unsqueeze(1).to(self.device)
+        # done_batch = Variable(torch.cat(batch.done)).unsqueeze(1).to(self.device)
+
         delay_gso_batch = Variable(torch.cat(tuple([s.delay_gso for s in batch.state]))).to(self.device)
-        gso_batch = Variable(torch.cat(tuple([s.curr_gso for s in batch.state]))).to(self.device)
-        next_delay_gso_batch = Variable(torch.cat(tuple([s.delay_gso for s in batch.next_state]))).to(self.device)
-        next_gso_batch = Variable(torch.cat(tuple([s.curr_gso for s in batch.next_state]))).to(self.device)
-
         delay_state_batch = Variable(torch.cat(tuple([s.delay_state for s in batch.state]))).to(self.device)
-        state_batch = Variable(torch.cat(tuple([s.values for s in batch.state]))).to(self.device)
-        next_delay_state_batch = Variable(torch.cat(tuple([s.delay_state for s in batch.next_state]))).to(self.device)
-        next_state_batch = Variable(torch.cat(tuple([s.values for s in batch.next_state]))).to(self.device)
-
-        action_batch = Variable(torch.cat(batch.action)).to(self.device)
-        reward_batch = Variable(torch.cat(batch.reward)).unsqueeze(1).to(self.device)
-        done_batch = Variable(torch.cat(batch.done)).unsqueeze(1).to(self.device)
-
-        # Determine next action and Target Q values
-        next_action_batch = self.actor_target(next_delay_state_batch, next_delay_gso_batch)
-        next_state_action_values = self.critic_target(next_state_batch, next_action_batch, next_gso_batch)
-
-        expected_state_action_batch = reward_batch + (self.gamma * done_batch * next_state_action_values)
-
-        # Optimize Critic
-        self.critic_optim.zero_grad()  # Reset Gradient to Zero
-        action_value_batch = self.critic(state_batch, action_batch, gso_batch)  # Evaluate Current Q values for batch
-
-        critic_loss = F.mse_loss(action_value_batch, expected_state_action_batch)
-        critic_loss.backward()
-        self.critic_optim.step()
-        # End Optimize Critic
+        actor_batch = self.actor(delay_state_batch, delay_gso_batch)
+        optimal_action_batch = Variable(torch.cat(batch.action)).to(self.device)
 
         # Optimize Actor
         self.actor_optim.zero_grad()
         # Loss related to sampled Actor Gradient.
-        policy_loss = -self.critic(state_batch, self.actor(delay_state_batch, delay_gso_batch), gso_batch).mean()
+        policy_loss = F.mse_loss(actor_batch, optimal_action_batch)
         policy_loss.backward()
         self.actor_optim.step()
         # End Optimize Actor
 
         # Write parameters to Target networks.
-        DDPG.soft_update(self.actor_target, self.actor, self.tau)
-        DDPG.soft_update(self.critic_target, self.critic, self.tau)
+        #ImitationLearning.soft_update(self.actor_target, self.actor, self.tau)
 
-        return critic_loss.item(), policy_loss.item()
+        return policy_loss.item()
 
-    def save_model(self, env_name, suffix="", actor_path=None, critic_path=None):
+    def save_model(self, env_name, suffix="", actor_path=None):
         """
-        Save the Actor and Critic Models after training is completed.
+        Save the Actor Model after training is completed.
         :param env_name: The environment name.
         :param suffix: The optional suffix.
         :param actor_path: The path to save the actor.
-        :param critic_path: The path to save the critic.
         :return: None
         """
         if not os.path.exists('models/'):
@@ -452,24 +342,19 @@ class DDPG(object):
 
         if actor_path is None:
             actor_path = "models/ddpg_actor_{}_{}".format(env_name, suffix)
-        if critic_path is None:
-            critic_path = "models/dppg_critic_{}_{}".format(env_name, suffix)
-        print('Saving models to {} and {}'.format(actor_path, critic_path))
+        print('Saving models to {} and {}'.format(actor_path))
         torch.save(self.actor.state_dict(), actor_path)
-        torch.save(self.critic.state_dict(), critic_path)
 
-    def load_model(self, actor_path, critic_path):
+
+    def load_model(self, actor_path):
         """
-        Load Actor and Critic Models from given paths.
+        Load Actor Model from given paths.
         :param actor_path: The actor path.
-        :param critic_path: The critic path.
         :return: None
         """
-        print('Loading models from {} and {}'.format(actor_path, critic_path))
+        print('Loading model from {}'.format(actor_path))
         if actor_path is not None:
             self.actor.load_state_dict(torch.load(actor_path).to(self.device))
-        if critic_path is not None:
-            self.critic.load_state_dict(torch.load(critic_path).to(self.device))
 
 
 class MultiAgentStateWithDelay(object):
@@ -523,8 +408,8 @@ class MultiAgentStateWithDelay(object):
 
 def train_ddpg(env, args, device):
     memory = ReplayBuffer(max_size=args.buffer_size)
-    ounoise = OUNoise(args.n_actions, args.n_agents, scale=1)
-    learner = DDPG(device, args)
+    #ounoise = OUNoise(args.n_actions, args.n_agents, scale=1)
+    learner = ImitationLearning(device, args)
 
     rewards = []
     total_numsteps = 0
@@ -533,15 +418,18 @@ def train_ddpg(env, args, device):
     n_episodes = 10000
 
     for i in range(n_episodes):
-        ounoise.reset()
+        #ounoise.reset()
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
         episode_reward = 0
         done = False
         while not done:
-            action = learner.select_action(state, ounoise)
-            next_state, reward, done, _ = env.step(action.cpu().numpy())
+
+            # action = learner.select_action(state, ounoise)
+            optimal_action = env.env.controller()
+            # next_state, reward, done, _ = env.step(action.cpu().numpy())
+            next_state, reward, done, _ = env.step(optimal_action)
 
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
 
@@ -553,6 +441,7 @@ def train_ddpg(env, args, device):
             reward = torch.Tensor([reward]).to(device)
 
             # action is (N, nA), need (B, 1, nA, N)
+            action = torch.Tensor(optimal_action).to(device)
             action = action.transpose(1, 0)
             action = action.reshape((1, 1, args.n_actions, args.n_agents))
 
@@ -564,7 +453,7 @@ def train_ddpg(env, args, device):
                 for _ in range(args.updates_per_step):
                     transitions = memory.sample(args.batch_size)
                     batch = Transition(*zip(*transitions))
-                    value_loss, policy_loss = learner.gradient_step(batch)
+                    policy_loss = learner.gradient_step(batch)
                     updates += 1
 
         rewards.append(episode_reward)
@@ -582,10 +471,9 @@ def train_ddpg(env, args, device):
                 episode_reward += reward
                 state = next_state
 
-            rewards.append(episode_reward)
             print("Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}".format(i, updates,
                                                                                                         total_numsteps,
-                                                                                                        rewards[-1],
+                                                                                                        episode_reward,
                                                                                                         np.mean(rewards[
                                                                                                                 -10:])))
 

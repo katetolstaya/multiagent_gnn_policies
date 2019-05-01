@@ -1,7 +1,7 @@
 import gym
 import gym_flock
 
-env_name = "Flocking-v0"
+env_name = "FlockingRelative-v0"
 env = gym.make(env_name)
 
 while True:
@@ -13,7 +13,7 @@ while True:
         next_state, reward, done, _ = env.step(action)
         episode_reward += reward
         state = next_state
-        #env.render()
+        env.render()
 
     print(episode_reward)
 
