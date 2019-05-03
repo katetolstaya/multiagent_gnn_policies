@@ -18,9 +18,9 @@ parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym 
 parser.add_argument('--batch_size', type=int, default=100, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
-parser.add_argument('--n_agents', type=int, default=20, help='n_agents')
+parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
-parser.add_argument('--n_states', type=int, default=6, help='n_states')
+parser.add_argument('--n_states', type=int, default=4, help='n_states')
 parser.add_argument('--k', type=int, default=3, help='k')
 parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
@@ -118,7 +118,6 @@ class Actor(nn.Module):
 
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
-
     def forward(self, delay_state, delay_gso):
         """
         The policy relies on delayed information from neighbors. During training, the full history for k time steps is
@@ -151,7 +150,7 @@ class Actor(nn.Module):
 
             if i < self.n_layers - 1:  # last layer - no relu
                 #x = self.layer_norms[i](x)
-                x = torch.tanh(x) #F.relu(x)
+                x = F.relu(x) #torch.tanh(x) #F.relu(x)
 
         x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
 
@@ -307,13 +306,13 @@ class MultiAgentStateWithDelay(object):
         # delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
         self.delay_gso = torch.zeros((1, k, n_agents, n_agents)).to(device)
         self.delay_gso[0, 0, :, :] = torch.eye(n_agents).view((1, 1, n_agents, n_agents)).to(device)  # I
-        if prev_state is not None:
+        if prev_state is not None and k > 1:
             self.delay_gso[0, 1:k, :, :] = torch.matmul(self.network, prev_state.delay_gso[0, 0:k - 1, :, :])
 
         # delayed x values x_t, x_t-1,..., x_t-k
         self.delay_state = torch.zeros((1, k, n_states, n_agents)).to(device)
         self.delay_state[0, 0, :, :] = self.values
-        if prev_state is not None:
+        if prev_state is not None and k > 1:
             self.delay_state[0, 1:k, :, :] = prev_state.delay_state[0, 0:k - 1, :, :]
 
 

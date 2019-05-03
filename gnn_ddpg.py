@@ -14,18 +14,22 @@ from torch.autograd import Variable
 
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
+# parser.add_argument('--env', type=str, default="FormationFlying-v0", help='Gym environment to run')
+# parser.add_argument('--n_agents', type=int, default=3, help='n_agents')
+# parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
+# parser.add_argument('--n_states', type=int, default=8, help='n_states')
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
-parser.add_argument('--batch_size', type=int, default=40, help='Batch size')
-parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
-parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
-parser.add_argument('--n_agents', type=int, default=20, help='n_agents')
+parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
-parser.add_argument('--n_states', type=int, default=6, help='n_states')
-parser.add_argument('--k', type=int, default=3, help='k')
-parser.add_argument('--hidden_size', type=int, default=64, help='hidden_size')
+parser.add_argument('--n_states', type=int, default=4, help='n_states')
+parser.add_argument('--k', type=int, default=1, help='k')
+parser.add_argument('--hidden_size', type=int, default=16, help='hidden_size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=7, help='random_seed')
+parser.add_argument('--seed', type=int, default=8, help='random_seed')
+parser.add_argument('--batch_size', type=int, default=100, help='Batch size')
+parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
+parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
 
 args = parser.parse_args()
 
@@ -242,10 +246,12 @@ class Actor(nn.Module):
             if i < self.n_layers - 1:  # last layer - no relu
                 #x = self.layer_norms[i](x)
                 x = F.relu(x)
+            else:
+                x = torch.tanh(x)
 
         x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
 
-        x = x.clamp(-1, 1)  # TODO these limits depend on the MDP
+        #x = x.clamp(-1, 1)  # TODO these limits depend on the MDP
 
         return x
 
@@ -256,7 +262,7 @@ class OUNoise:
     control problems with inertia. See https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
     """
 
-    def __init__(self, n_a, n_agents, scale=0.5, mu=0, theta=0.5, sigma=0.5):  # TODO change default params
+    def __init__(self, n_a, n_agents, scale=0.05, mu=0, theta=0.15, sigma=0.2):  # TODO change default params
         """
         Initialize the Noise parameters.
         :param n_a: Size of the Action space.
@@ -349,8 +355,8 @@ class DDPG(object):
         self.critic_target = Critic(n_s, n_a, hidden_layers, k).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-7)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-5)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-5)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-4)
 
         # Constants
         self.gamma = gamma
@@ -511,13 +517,13 @@ class MultiAgentStateWithDelay(object):
         # delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
         self.delay_gso = torch.zeros((1, k, n_agents, n_agents)).to(device)
         self.delay_gso[0, 0, :, :] = torch.eye(n_agents).view((1, 1, n_agents, n_agents)).to(device)  # I
-        if prev_state is not None:
+        if prev_state is not None and k > 1:
             self.delay_gso[0, 1:k, :, :] = torch.matmul(self.network, prev_state.delay_gso[0, 0:k - 1, :, :])
 
         # delayed x values x_t, x_t-1,..., x_t-k
         self.delay_state = torch.zeros((1, k, n_states, n_agents)).to(device)
         self.delay_state[0, 0, :, :] = self.values
-        if prev_state is not None:
+        if prev_state is not None and k > 1:
             self.delay_state[0, 1:k, :, :] = prev_state.delay_state[0, 0:k - 1, :, :]
 
 
@@ -581,6 +587,7 @@ def train_ddpg(env, args, device):
                 next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                 episode_reward += reward
                 state = next_state
+                #env.render()
 
             rewards.append(episode_reward)
             print("Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}".format(i, updates,
