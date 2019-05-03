@@ -21,7 +21,7 @@ parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per
 parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=4, help='n_states')
-parser.add_argument('--k', type=int, default=3, help='k')
+parser.add_argument('--k', type=int, default=1, help='k')
 parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
@@ -326,7 +326,12 @@ def train_ddpg(env, args, device):
 
     n_episodes = 10000
 
+    beta = 1
+    beta_coeff = 0.99
+
     for i in range(n_episodes):
+
+        beta = beta * beta_coeff
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
@@ -334,10 +339,14 @@ def train_ddpg(env, args, device):
         done = False
         while not done:
 
-            # action = learner.select_action(state)
             optimal_action = env.env.controller()
-            # next_state, reward, done, _ = env.step(action.cpu().numpy())
-            next_state, reward, done, _ = env.step(optimal_action)
+            if np.random.binomial(1, beta) > 0:
+                action = optimal_action
+            else:
+                action = learner.select_action(state)
+                action = action.cpu().numpy()
+
+            next_state, reward, done, _ = env.step(action)
 
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
 
@@ -349,11 +358,11 @@ def train_ddpg(env, args, device):
             reward = torch.Tensor([reward]).to(device)
 
             # action is (N, nA), need (B, 1, nA, N)
-            action = torch.Tensor(optimal_action).to(device)
-            action = action.transpose(1, 0)
-            action = action.reshape((1, 1, args.n_actions, args.n_agents))
+            optimal_action = torch.Tensor(optimal_action).to(device)
+            optimal_action = optimal_action.transpose(1, 0)
+            optimal_action = optimal_action.reshape((1, 1, args.n_actions, args.n_agents))
 
-            memory.insert(Transition(state, action, notdone, next_state, reward))
+            memory.insert(Transition(state, optimal_action, notdone, next_state, reward))
 
             state = next_state
 
