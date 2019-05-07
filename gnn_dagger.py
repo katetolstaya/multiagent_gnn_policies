@@ -20,13 +20,13 @@ parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffe
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
 parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
-parser.add_argument('--n_states', type=int, default=4, help='n_states')
-parser.add_argument('--k', type=int, default=1, help='k')
+parser.add_argument('--n_states', type=int, default=6, help='n_states')
+parser.add_argument('--k', type=int, default=2, help='k')
 parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
 parser.add_argument('--seed', type=int, default=7, help='random_seed')
-parser.add_argument('--actor_lr', type=float, default=1e-4, help='learning rate for actor')
+parser.add_argument('--actor_lr', type=float, default=2e-5, help='learning rate for actor')
 
 args = parser.parse_args()
 
@@ -151,10 +151,12 @@ class Actor(nn.Module):
             if i < self.n_layers - 1:  # last layer - no relu
                 #x = self.layer_norms[i](x)
                 x = F.relu(x) #torch.tanh(x) #F.relu(x)
+            # else:
+            #     x = 10 * torch.tanh(x)
 
         x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
 
-        #x = x.clamp(-1, 1)  # TODO these limits depend on the MDP
+        #x = x.clamp(-10, 10)  # TODO these limits depend on the MDP
 
         return x
 
@@ -183,7 +185,7 @@ class ImitationLearning(object):
         self.device = device
 
         hidden_layers = [hidden_size, hidden_size]
-        ind_agg = 1  # int(len(hidden_layers) / 2)  # aggregate halfway
+        ind_agg = 0  # int(len(hidden_layers) / 2)  # aggregate halfway
 
         # Define Networks
         self.actor = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
@@ -377,16 +379,24 @@ def train_ddpg(env, args, device):
         # print(i)
         # print(episode_reward)
         if i % 10 == 0:
-            # state = torch.Tensor([env.reset()]).to(device)
-            state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
+
             episode_reward = 0
-            done = False
-            while not done:
-                action = learner.select_action(state)
-                next_state, reward, done, _ = env.step(action.cpu().numpy())
-                next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
-                episode_reward += reward
-                state = next_state
+            n_eps = 10
+            for n in range(n_eps):
+                # state = torch.Tensor([env.reset()]).to(device)
+                state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
+
+                done = False
+                while not done:
+                    action = learner.select_action(state)
+                    action = action.cpu().numpy()
+                    #action = env.env.controller()
+                    next_state, reward, done, _ = env.step(action)
+                    next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
+                    episode_reward += reward
+                    state = next_state
+
+            episode_reward = episode_reward / n_eps
 
             print("Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}".format(i, updates,
                                                                                                         total_numsteps,
@@ -396,6 +406,8 @@ def train_ddpg(env, args, device):
 
     env.close()
     learner.save_model(args.env)
+
+
 
 
 def main():
