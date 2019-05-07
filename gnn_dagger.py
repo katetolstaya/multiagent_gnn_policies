@@ -25,7 +25,7 @@ parser.add_argument('--k', type=int, default=2, help='k')
 parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=7, help='random_seed')
+parser.add_argument('--seed', type=int, default=9, help='random_seed')
 parser.add_argument('--actor_lr', type=float, default=2e-5, help='learning rate for actor')
 
 args = parser.parse_args()
