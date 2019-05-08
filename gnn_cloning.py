@@ -22,7 +22,7 @@ parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=2, help='k')
-parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
+parser.add_argument('--hidden_size', type=int, default=16, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
 parser.add_argument('--seed', type=int, default=7, help='random_seed')
@@ -360,7 +360,7 @@ def train_ddpg(env, args, device):
             state = next_state
 
 
-        rewards.append(episode_reward)
+
 
         if memory.curr_size > args.batch_size:
             for _ in range(args.updates_per_step):
@@ -377,7 +377,7 @@ def train_ddpg(env, args, device):
         if i % 10 == 0:
 
             episode_reward = 0
-            n_eps = 10
+            n_eps = 1
             for n in range(n_eps):
                 # state = torch.Tensor([env.reset()]).to(device)
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
@@ -389,16 +389,14 @@ def train_ddpg(env, args, device):
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                     episode_reward += reward
                     state = next_state
-
-            episode_reward = episode_reward / n_eps
+            rewards.append(episode_reward)
 
             print(
                 "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
                     i, updates,
                     total_numsteps,
-                    episode_reward,
-                    np.mean(rewards[
-                            -10:]), policy_loss_sum))
+                    rewards[-1],
+                    np.mean(rewards), policy_loss_sum))
     env.close()
     learner.save_model(args.env)
 
