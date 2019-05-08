@@ -15,9 +15,9 @@ from torch.autograd import Variable
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
-parser.add_argument('--batch_size', type=int, default=100, help='Batch size')
+parser.add_argument('--batch_size', type=int, default=50, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
-parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
+parser.add_argument('--updates_per_step', type=int, default=20, help='Updates per Batch')
 parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
@@ -26,7 +26,7 @@ parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer si
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
 parser.add_argument('--seed', type=int, default=7, help='random_seed')
-parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
+parser.add_argument('--actor_lr', type=float, default=1e-3, help='learning rate for actor')
 args = parser.parse_args()
 
 Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 'reward'))
@@ -333,6 +333,7 @@ def train_ddpg(env, args, device):
 
         episode_reward = 0
         done = False
+        policy_loss_sum = 0
         while not done:
 
             # action = learner.select_action(state)
@@ -358,14 +359,19 @@ def train_ddpg(env, args, device):
 
             state = next_state
 
-            if memory.curr_size > args.batch_size:
-                for _ in range(args.updates_per_step):
-                    transitions = memory.sample(args.batch_size)
-                    batch = Transition(*zip(*transitions))
-                    policy_loss = learner.gradient_step(batch)
-                    updates += 1
 
         rewards.append(episode_reward)
+
+        if memory.curr_size > args.batch_size:
+            for _ in range(args.updates_per_step):
+                transitions = memory.sample(args.batch_size)
+                batch = Transition(*zip(*transitions))
+                policy_loss = learner.gradient_step(batch)
+                policy_loss_sum += policy_loss
+                updates += 1
+
+
+
         # print(i)
         # print(episode_reward)
         if i % 10 == 0:
@@ -386,11 +392,13 @@ def train_ddpg(env, args, device):
 
             episode_reward = episode_reward / n_eps
 
-            print("Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}".format(i, updates,
-                                                                                                        total_numsteps,
-                                                                                                        episode_reward,
-                                                                                                        np.mean(rewards[
-                                                                                                                -10:])))
+            print(
+                "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
+                    i, updates,
+                    total_numsteps,
+                    episode_reward,
+                    np.mean(rewards[
+                            -10:]), policy_loss_sum))
     env.close()
     learner.save_model(args.env)
 

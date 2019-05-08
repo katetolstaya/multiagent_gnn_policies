@@ -15,9 +15,9 @@ from torch.autograd import Variable
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
-parser.add_argument('--batch_size', type=int, default=100, help='Batch size')
+parser.add_argument('--batch_size', type=int, default=50, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
-parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
+parser.add_argument('--updates_per_step', type=int, default=200, help='Updates per Batch')
 parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
@@ -31,6 +31,7 @@ parser.add_argument('--actor_lr', type=float, default=2e-5, help='learning rate 
 args = parser.parse_args()
 
 Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 'reward'))
+
 
 # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
@@ -149,14 +150,14 @@ class Actor(nn.Module):
             x = self.conv_layers[i](x)  # now (B,G,1,N)
 
             if i < self.n_layers - 1:  # last layer - no relu
-                #x = self.layer_norms[i](x)
-                x = F.relu(x) #torch.tanh(x) #F.relu(x)
+                # x = self.layer_norms[i](x)
+                x = F.relu(x)  # torch.tanh(x) #F.relu(x)
             # else:
             #     x = 10 * torch.tanh(x)
 
         x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
 
-        #x = x.clamp(-10, 10)  # TODO these limits depend on the MDP
+        # x = x.clamp(-10, 10)  # TODO these limits depend on the MDP
 
         return x
 
@@ -197,7 +198,6 @@ class ImitationLearning(object):
         self.gamma = gamma
         self.tau = tau
 
-
     def select_action(self, state):
         """
         Evaluate the Actor network over the given state, and with injection of noise.
@@ -207,7 +207,7 @@ class ImitationLearning(object):
         :return:
         """
         self.actor.eval()  # Switch the actor network to Evaluation Mode.
-        mu = self.actor(state.delay_state, state.delay_gso) #.to(self.device)
+        mu = self.actor(state.delay_state, state.delay_gso)  # .to(self.device)
 
         # mu is (B, 1, nA, N), need (N, nA)
         mu = mu.permute(0, 1, 3, 2)
@@ -217,7 +217,7 @@ class ImitationLearning(object):
         mu = mu.data
         return mu
 
-        #return mu.clamp(-1, 1)  # TODO clamp action to what space?
+        # return mu.clamp(-1, 1)  # TODO clamp action to what space?
 
     def gradient_step(self, batch):
         """
@@ -256,7 +256,6 @@ class ImitationLearning(object):
             actor_path = "models/ddpg_actor_{}_{}".format(env_name, suffix)
         print('Saving model to {}'.format(actor_path))
         torch.save(self.actor.state_dict(), actor_path)
-
 
     def load_model(self, actor_path):
         """
@@ -329,7 +328,7 @@ def train_ddpg(env, args, device):
     n_episodes = 10000
 
     beta = 1
-    beta_coeff = 0.99
+    beta_coeff = 0.993
 
     for i in range(n_episodes):
 
@@ -339,6 +338,7 @@ def train_ddpg(env, args, device):
 
         episode_reward = 0
         done = False
+        policy_loss_sum = 0
         while not done:
 
             optimal_action = env.env.controller()
@@ -368,20 +368,22 @@ def train_ddpg(env, args, device):
 
             state = next_state
 
-            if memory.curr_size > args.batch_size:
-                for _ in range(args.updates_per_step):
-                    transitions = memory.sample(args.batch_size)
-                    batch = Transition(*zip(*transitions))
-                    policy_loss = learner.gradient_step(batch)
-                    updates += 1
-
         rewards.append(episode_reward)
+
+        if memory.curr_size > args.batch_size:
+            for _ in range(args.updates_per_step):
+                transitions = memory.sample(args.batch_size)
+                batch = Transition(*zip(*transitions))
+                policy_loss = learner.gradient_step(batch)
+                policy_loss_sum += policy_loss
+                updates += 1
+
         # print(i)
         # print(episode_reward)
         if i % 10 == 0:
 
             episode_reward = 0
-            n_eps = 10
+            n_eps = 1
             for n in range(n_eps):
                 # state = torch.Tensor([env.reset()]).to(device)
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
@@ -390,7 +392,7 @@ def train_ddpg(env, args, device):
                 while not done:
                     action = learner.select_action(state)
                     action = action.cpu().numpy()
-                    #action = env.env.controller()
+                    # action = env.env.controller()
                     next_state, reward, done, _ = env.step(action)
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                     episode_reward += reward
@@ -398,16 +400,16 @@ def train_ddpg(env, args, device):
 
             episode_reward = episode_reward / n_eps
 
-            print("Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}".format(i, updates,
-                                                                                                        total_numsteps,
-                                                                                                        episode_reward,
-                                                                                                        np.mean(rewards[
-                                                                                                                -10:])))
+            print(
+                "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
+                    i, updates,
+                    total_numsteps,
+                    episode_reward,
+                    np.mean(rewards[
+                            -10:]), policy_loss_sum))
 
     env.close()
     learner.save_model(args.env)
-
-
 
 
 def main():
