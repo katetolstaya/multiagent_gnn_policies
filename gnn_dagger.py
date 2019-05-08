@@ -26,7 +26,7 @@ parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer si
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
 parser.add_argument('--seed', type=int, default=9, help='random_seed')
-parser.add_argument('--actor_lr', type=float, default=2e-5, help='learning rate for actor')
+parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
 
 args = parser.parse_args()
 
@@ -332,7 +332,7 @@ def train_ddpg(env, args, device):
 
     for i in range(n_episodes):
 
-        beta = beta * beta_coeff
+        beta = max(beta * beta_coeff, 0.25)
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
