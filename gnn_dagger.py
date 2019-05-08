@@ -378,28 +378,20 @@ def train_ddpg(env, args, device, debug=True):
                 policy_loss_sum += policy_loss
                 updates += 1
 
-        # print(i)
-        # print(episode_reward)
         if i % 10 == 0:
 
             episode_reward = 0
             n_eps = 1
             for n in range(n_eps):
-                # state = torch.Tensor([env.reset()]).to(device)
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
-
                 done = False
                 while not done:
                     action = learner.select_action(state)
-                    action = action.cpu().numpy()
-                    # action = env.env.controller()
-                    next_state, reward, done, _ = env.step(action)
+                    next_state, reward, done, _ = env.step(action.cpu().numpy())
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                     episode_reward += reward
                     state = next_state
-
             rewards.append(episode_reward)
-
 
             if debug:
                 print(
@@ -407,7 +399,7 @@ def train_ddpg(env, args, device, debug=True):
                         i, updates,
                         total_numsteps,
                         rewards[-1],
-                        np.mean(rewards[-20:]), policy_loss_sum))
+                        np.mean(rewards[-10:]), policy_loss_sum))
 
     env.close()
     learner.save_model(args.env)

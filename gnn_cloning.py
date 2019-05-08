@@ -16,17 +16,17 @@ from torch.autograd import Variable
 parser = argparse.ArgumentParser(description='DDPG Implementation')
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
 parser.add_argument('--batch_size', type=int, default=50, help='Batch size')
-parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
-parser.add_argument('--updates_per_step', type=int, default=20, help='Updates per Batch')
-parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
+parser.add_argument('--buffer_size', type=int, default=5000, help='Replay Buffer Size')
+parser.add_argument('--updates_per_step', type=int, default=200, help='Updates per Batch')
+parser.add_argument('--n_agents', type=int, default=80, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 parser.add_argument('--k', type=int, default=2, help='k')
-parser.add_argument('--hidden_size', type=int, default=16, help='hidden layer size')
+parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=7, help='random_seed')
-parser.add_argument('--actor_lr', type=float, default=1e-3, help='learning rate for actor')
+parser.add_argument('--seed', type=int, default=11, help='random_seed')
+parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
 args = parser.parse_args()
 
 Transition = namedtuple('Transition', ('state', 'action', 'done', 'next_state', 'reward'))
@@ -148,8 +148,9 @@ class Actor(nn.Module):
             x = self.conv_layers[i](x)  # now (B,G,1,N)
 
             if i < self.n_layers - 1:  # last layer - no relu
+                x = torch.tanh(x)
                 #x = self.layer_norms[i](x)
-                x = F.relu(x) #torch.tanh(x) #F.relu(x)
+                #x = F.relu(x) #torch.tanh(x) #F.relu(x)
             # else:
             #     x = 10 * torch.tanh(x)
 
@@ -184,7 +185,7 @@ class ImitationLearning(object):
         self.device = device
 
         hidden_layers = [hidden_size, hidden_size]
-        ind_agg = 1  # int(len(hidden_layers) / 2)  # aggregate halfway
+        ind_agg = 0  # int(len(hidden_layers) / 2)  # aggregate halfway
 
         # Define Networks
         self.actor = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
@@ -317,7 +318,7 @@ class MultiAgentStateWithDelay(object):
             self.delay_state[0, 1:k, :, :] = prev_state.delay_state[0, 0:k - 1, :, :]
 
 
-def train_ddpg(env, args, device):
+def train_ddpg(env, args, device, debug=True):
     memory = ReplayBuffer(max_size=args.buffer_size)
     learner = ImitationLearning(device, args)
 
@@ -359,9 +360,6 @@ def train_ddpg(env, args, device):
 
             state = next_state
 
-
-
-
         if memory.curr_size > args.batch_size:
             for _ in range(args.updates_per_step):
                 transitions = memory.sample(args.batch_size)
@@ -370,18 +368,12 @@ def train_ddpg(env, args, device):
                 policy_loss_sum += policy_loss
                 updates += 1
 
-
-
-        # print(i)
-        # print(episode_reward)
         if i % 10 == 0:
 
             episode_reward = 0
             n_eps = 1
             for n in range(n_eps):
-                # state = torch.Tensor([env.reset()]).to(device)
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
-
                 done = False
                 while not done:
                     action = learner.select_action(state)
@@ -391,12 +383,13 @@ def train_ddpg(env, args, device):
                     state = next_state
             rewards.append(episode_reward)
 
-            print(
-                "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
-                    i, updates,
-                    total_numsteps,
-                    rewards[-1],
-                    np.mean(rewards), policy_loss_sum))
+            if debug:
+                print(
+                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
+                        i, updates,
+                        total_numsteps,
+                        rewards[-1],
+                        np.mean(rewards[-10:]), policy_loss_sum))
     env.close()
     learner.save_model(args.env)
 
