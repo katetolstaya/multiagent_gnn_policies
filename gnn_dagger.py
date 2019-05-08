@@ -332,7 +332,7 @@ def train_ddpg(env, args, device):
 
     for i in range(n_episodes):
 
-        beta = max(beta * beta_coeff, 0.25)
+        beta = max(beta * beta_coeff, 0.5)
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
