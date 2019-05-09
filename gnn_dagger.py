@@ -391,6 +391,7 @@ def train_ddpg(env, args, device, debug=True):
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                     episode_reward += reward
                     state = next_state
+                    env.render()
             rewards.append(episode_reward)
 
             if debug:
