@@ -158,12 +158,12 @@ def train_dagger(env, args, device, debug=True):
     total_numsteps = 0
     updates = 0
 
-    n_episodes = 1000
+    n_episodes = 800
 
     beta = 1
     beta_coeff = 0.993
 
-    best_avg_reward = np.Inf
+    best_avg_reward = -1.0 * np.Inf
 
     for i in range(n_episodes):
 
@@ -233,12 +233,13 @@ def train_dagger(env, args, device, debug=True):
                         i, updates,
                         total_numsteps,
                         rewards[-1],
-                        np.mean(rewards[-10:]), policy_loss_sum))
+                        np.mean(rewards[-20:]), policy_loss_sum))
 
             best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
 
     env.close()
-    learner.save_model(args.env)
+    if debug:
+        learner.save_model(args.env)
     return best_avg_reward
 
 
