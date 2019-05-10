@@ -19,8 +19,8 @@ from actor import Actor
 parser = argparse.ArgumentParser(description='DAGGER Implementation')
 
 # learning parameters
-parser.add_argument('--batch_size', type=int, default=50, help='Batch size')
-parser.add_argument('--buffer_size', type=int, default=5000, help='Replay Buffer Size')
+parser.add_argument('--batch_size', type=int, default=20, help='Batch size')
+parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=200, help='Updates per Batch')
 parser.add_argument('--seed', type=int, default=11, help='random_seed')
 parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
@@ -34,7 +34,7 @@ parser.add_argument('--tau', type=float, default=0.5, help='tau')
 # env parameters
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
 parser.add_argument('--v_max', type=float, default=3.0, help='maximum initial flock vel')
-parser.add_argument('--comm_radius', type=float, default=0.9, help='flock communication radius')
+parser.add_argument('--comm_radius', type=float, default=1.0, help='flock communication radius')
 parser.add_argument('--n_agents', type=int, default=90, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
@@ -158,10 +158,12 @@ def train_dagger(env, args, device, debug=True):
     total_numsteps = 0
     updates = 0
 
-    n_episodes = 10000
+    n_episodes = 1000
 
     beta = 1
     beta_coeff = 0.993
+
+    best_avg_reward = np.Inf
 
     for i in range(n_episodes):
 
@@ -233,9 +235,11 @@ def train_dagger(env, args, device, debug=True):
                         rewards[-1],
                         np.mean(rewards[-10:]), policy_loss_sum))
 
+            best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
+
     env.close()
     learner.save_model(args.env)
-    return np.mean(rewards[-20:])
+    return best_avg_reward
 
 
 def main():
@@ -255,7 +259,7 @@ def main():
 
     # initialize params tuple
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train_dagger(env, args, device)
+    print(train_dagger(env, args, device))
 
 
 if __name__ == "__main__":
