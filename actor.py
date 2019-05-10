@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 
+# TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
+
+
 class Actor(nn.Module):
 
     def __init__(self, n_s, n_a, hidden_layers, k, ind_agg):

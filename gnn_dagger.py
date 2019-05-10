@@ -1,13 +1,11 @@
 import argparse
 import numpy as np
 import os
-
 import random
 import gym
 import gym_flock
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from torch.autograd import Variable
@@ -36,6 +34,7 @@ parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate 
 args = parser.parse_args()
 
 # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
+
 
 class DAGGER(object):
 

@@ -1,13 +1,11 @@
 import argparse
 import numpy as np
 import os
-from collections import namedtuple
 import random
 import gym
 import gym_flock
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 from torch.autograd import Variable
@@ -15,13 +13,11 @@ from torch.autograd import Variable
 from state_with_delay import MultiAgentStateWithDelay
 from replay_buffer import ReplayBuffer
 from replay_buffer import Transition
+from actor import Actor
+from critic import Critic
 
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
-# parser.add_argument('--env', type=str, default="FormationFlying-v0", help='Gym environment to run')
-# parser.add_argument('--n_agents', type=int, default=3, help='n_agents')
-# parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
-# parser.add_argument('--n_states', type=int, default=8, help='n_states')
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
 parser.add_argument('--n_agents', type=int, default=40, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
@@ -36,181 +32,6 @@ parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffe
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
 
 args = parser.parse_args()
-
-
-# TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
-
-
-class Critic(nn.Module):
-
-    def __init__(self, n_s, n_a, hidden_layers, k):
-        """
-        The actor network is centralized, so it can have any number of [GSO -> Linearity -> Activation] layers
-        If there's a lot of layers here, it doesn't matter if we have a non-linearity or GSO first (test this).
-        :param n_s: number of MDP states per agent
-        :param n_a: number of MDP actions per agent
-        :param hidden_layers: list of ints that will determine the width of each hidden layer
-        :param k: aggregation filter length
-        """
-        super(Critic, self).__init__()
-
-        self.k = k
-        self.n_s = n_s
-        self.n_a = n_a
-
-        self.layers = [self.n_s + self.n_a] + hidden_layers + [1]
-        self.n_layers = len(self.layers) - 1
-        self.conv_layers = []
-        self.gso_first = True
-
-        for i in range(self.n_layers):
-
-            if i > 0 or self.gso_first:  # After GSO is applied, the data has shape[1]=K channels
-                in_channels = k
-            else:
-                in_channels = 1
-
-            m = nn.Conv2d(in_channels=in_channels, out_channels=self.layers[i + 1], kernel_size=(self.layers[i], 1),
-                          stride=(self.layers[i], 1))
-            self.conv_layers.append(m)
-        self.conv_layers = torch.nn.ModuleList(self.conv_layers)
-
-        self.layer_norms = []
-        for i in range(self.n_layers-1):
-            m = nn.GroupNorm(self.layers[i+1], self.layers[i+1])
-            self.layer_norms.append(m)
-
-        self.layer_norms = torch.nn.ModuleList(self.layer_norms)
-
-    def forward(self, states, actions, gso):
-        """
-        Evaluate the critic network
-        :param states: Current states of shape (B,1,n_s,N), where B = # batches, n_s = # features, N = # agents
-        :param actions: Current actions of shape (B,1,n_a,N), where B = # batches, n_a = # features, N = # agents
-        :param gso: Current GSO = [I, A_t, A_t^2,..., A_t^K-1] of shape (B,K,N,N)
-        :return:
-        """
-
-        # check input size, which is critical for correct GSO application
-        batch_size = np.shape(states)[0]
-        n_agents = states.shape[3]
-
-        assert batch_size == actions.shape[0]
-        assert batch_size == gso.shape[0]
-        assert states.shape[1] == 1
-        assert actions.shape[2] == self.n_a
-        assert actions.shape[3] == n_agents
-        assert states.shape[2] == self.n_s
-
-        assert gso.shape[1] == self.k
-        assert gso.shape[2] == n_agents
-        assert gso.shape[3] == n_agents
-
-        x = torch.cat((states, actions), 2)
-
-        # GSO -> Linearity -> Activation
-        for i in range(self.n_layers):
-
-            if i > 0 or self.gso_first:
-                x = torch.matmul(x, gso)  # GSO
-
-            x = self.conv_layers[i](x)  # Linear layer
-
-            if i < self.n_layers - 1:  # last layer needs no relu()
-                x = self.layer_norms[i](x)
-                x = F.relu(x)
-
-            x = x.view((batch_size, 1, self.layers[i + 1], n_agents))
-
-        x = x.view((batch_size, 1, n_agents))  # now size (B, 1, N)
-
-        return x  # size of x here is batch_size x output_layer x 1 x n_agents
-
-
-class Actor(nn.Module):
-
-    def __init__(self, n_s, n_a, hidden_layers, k, ind_agg):
-        """
-        The policy network is allowed to have only one aggregation operation due to communication latency, but we can
-        have any number of hidden layers to be executed by each agent individually.
-        :param n_s: number of MDP states per agent
-        :param n_a: number of MDP actions per agent
-        :param hidden_layers: list of ints that will determine the width of each hidden layer
-        :param k: aggregation filter length
-        :param ind_agg: before which MLP layer index to aggregate
-        """
-        super(Actor, self).__init__()
-        self.k = k
-        self.n_s = n_s
-        self.n_a = n_a
-        self.layers = [n_s] + hidden_layers + [n_a]
-        self.n_layers = len(self.layers) - 1
-
-        self.ind_agg = ind_agg  # before which conv layer the aggregation happens
-
-        self.conv_layers = []
-
-        for i in range(0, self.n_layers):
-
-            if i == self.ind_agg:  # after the GSO, reduce dimensions
-                step = k
-            else:
-                step = 1
-
-            m = nn.Conv2d(in_channels=self.layers[i], out_channels=self.layers[i + 1], kernel_size=(step, 1),
-                          stride=(step, 1))
-
-            self.conv_layers.append(m)
-
-        self.conv_layers = torch.nn.ModuleList(self.conv_layers)
-
-        # self.layer_norms = []
-        # for i in range(self.n_layers-1):
-        #     m = nn.GroupNorm(self.layers[i+1], self.layers[i+1])
-        #     self.layer_norms.append(m)
-        # self.layer_norms = torch.nn.ModuleList(self.layer_norms)
-
-    def forward(self, delay_state, delay_gso):
-        """
-        The policy relies on delayed information from neighbors. During training, the full history for k time steps is
-        necessary.
-        :param delay_state: History of states: x_t, x_t-1,...x_t-k+1 of shape (B,K,F,N)
-        :param delay_gso: Delayed GSO: [I, A_t, A_t A_t-1, A_t ... A_t-k+1] of shape (B,K,N,N)
-        :return:
-        """
-        batch_size = delay_state.shape[0]
-        n_agents = delay_state.shape[3]
-        assert delay_gso.shape[0] == batch_size
-        assert delay_gso.shape[2] == n_agents
-        assert delay_gso.shape[3] == n_agents
-
-        assert delay_state.shape[1] == self.k
-        assert delay_state.shape[2] == self.n_s
-        assert delay_gso.shape[1] == self.k
-
-        x = delay_state
-        x = x.permute(0, 2, 1, 3)  # now (B,F,K,N)
-
-        for i in range(self.n_layers):
-
-            if i == self.ind_agg:  # aggregation only happens once - otherwise each agent operates independently
-                x = x.permute(0, 2, 1, 3)  # now (B,K,F,N)
-                x = torch.matmul(x, delay_gso)
-                x = x.permute(0, 2, 1, 3)  # now (B,F,K,N)
-
-            x = self.conv_layers[i](x)  # now (B,G,1,N)
-
-            if i < self.n_layers - 1:  # last layer - no relu
-                #x = self.layer_norms[i](x)
-                x = F.relu(x)
-            else:
-                x = torch.tanh(x)
-
-        x = x.view((batch_size, 1, self.n_a, n_agents))  # now size (B, 1, nA, N)
-
-        #x = x.clamp(-1, 1)  # TODO these limits depend on the MDP
-
-        return x
 
 
 class OUNoise:
