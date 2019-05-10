@@ -1,4 +1,4 @@
-# multiagent_ddpg
+# Learning Multi-Agent Policies using Graph Neural Networks
 
 ## Available algorithms:
 - Deterministic Deep Policy Gradients 
