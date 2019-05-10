@@ -16,20 +16,28 @@ from replay_buffer import Transition
 from actor import Actor
 
 ''' Parse Arguments'''
-parser = argparse.ArgumentParser(description='DDPG Implementation')
-parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
+parser = argparse.ArgumentParser(description='Behavior Cloning Implementation')
+
+# learning parameters
 parser.add_argument('--batch_size', type=int, default=50, help='Batch size')
 parser.add_argument('--buffer_size', type=int, default=5000, help='Replay Buffer Size')
 parser.add_argument('--updates_per_step', type=int, default=200, help='Updates per Batch')
-parser.add_argument('--n_agents', type=int, default=80, help='n_agents')
-parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
-parser.add_argument('--n_states', type=int, default=6, help='n_states')
+parser.add_argument('--seed', type=int, default=11, help='random_seed')
+parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
+
+# architecture parameters
 parser.add_argument('--k', type=int, default=2, help='k')
 parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
 parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
 parser.add_argument('--tau', type=float, default=0.5, help='tau')
-parser.add_argument('--seed', type=int, default=11, help='random_seed')
-parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
+
+# env parameters
+parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
+parser.add_argument('--v_max', type=float, default=3.0, help='maximum initial flock vel')
+parser.add_argument('--comm_radius', type=float, default=0.9, help='flock communication radius')
+parser.add_argument('--n_agents', type=int, default=90, help='n_agents')
+parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
+parser.add_argument('--n_states', type=int, default=6, help='n_states')
 args = parser.parse_args()
 
 
@@ -145,7 +153,7 @@ class ImitationLearning(object):
 
 
 
-def train_ddpg(env, args, device, debug=True):
+def train_cloning(env, args, device, debug=True):
     memory = ReplayBuffer(max_size=args.buffer_size)
     learner = ImitationLearning(device, args)
 
@@ -225,6 +233,11 @@ def main():
     # initialize gym env
     env = gym.make(args.env)
 
+    if args.env == "FlockingRelative-v0":
+        env.env.set_num_agents(args.n_agents)
+        env.env.set_comm_radius(args.comm_radius)
+        env.env.set_initial_vmax(args.v_max)
+
     # use seed
     env.seed(args.seed)
     random.seed(args.seed)
@@ -233,7 +246,7 @@ def main():
 
     # initialize params tuple
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train_ddpg(env, args, device)
+    train_cloning(env, args, device)
 
 
 if __name__ == "__main__":
