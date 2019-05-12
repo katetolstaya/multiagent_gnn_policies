@@ -44,7 +44,7 @@ def main():
         env.env.set_initial_vmax(args.v_max)
 
     print("k, reward")
-    for k in range(1, 6):
+    for k in range(1, 8):
 
         # use seed
         env.seed(args.seed)
