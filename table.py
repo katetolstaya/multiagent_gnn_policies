@@ -27,7 +27,7 @@ parser.add_argument('--tau', type=float, default=0.5, help='tau')
 parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
 parser.add_argument('--v_max', type=float, default=3.0, help='maximum initial flock vel')
 parser.add_argument('--comm_radius', type=float, default=1.0, help='flock communication radius')
-parser.add_argument('--n_agents', type=int, default=90, help='n_agents')
+parser.add_argument('--n_agents', type=int, default=100, help='n_agents')
 parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
 parser.add_argument('--n_states', type=int, default=6, help='n_states')
 
