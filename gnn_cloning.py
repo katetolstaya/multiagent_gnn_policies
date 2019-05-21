@@ -1,9 +1,5 @@
-import argparse
 import numpy as np
 import os
-import random
-import gym
-import gym_flock
 
 import torch
 import torch.nn.functional as F
@@ -14,32 +10,6 @@ from state_with_delay import MultiAgentStateWithDelay
 from replay_buffer import ReplayBuffer
 from replay_buffer import Transition
 from actor import Actor
-
-''' Parse Arguments'''
-parser = argparse.ArgumentParser(description='Behavior Cloning Implementation')
-
-# learning parameters
-parser.add_argument('--batch_size', type=int, default=50, help='Batch size')
-parser.add_argument('--buffer_size', type=int, default=5000, help='Replay Buffer Size')
-parser.add_argument('--updates_per_step', type=int, default=200, help='Updates per Batch')
-parser.add_argument('--seed', type=int, default=11, help='random_seed')
-parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
-
-# architecture parameters
-parser.add_argument('--k', type=int, default=2, help='k')
-parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
-parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
-parser.add_argument('--tau', type=float, default=0.5, help='tau')
-
-# env parameters
-parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
-parser.add_argument('--v_max', type=float, default=3.0, help='maximum initial flock vel')
-parser.add_argument('--comm_radius', type=float, default=0.9, help='flock communication radius')
-parser.add_argument('--n_agents', type=int, default=90, help='n_agents')
-parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
-parser.add_argument('--n_states', type=int, default=6, help='n_states')
-args = parser.parse_args()
-
 
 # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
@@ -53,16 +23,16 @@ class ImitationLearning(object):
         :param args: experiment arguments
         """
 
-        n_s = args.n_states
-        n_a = args.n_actions
-        k = args.k
-        hidden_size = args.hidden_size
-        gamma = args.gamma
-        tau = args.tau
+        n_s = args.getint('n_states')
+        n_a = args.getint('n_actions')
+        k = args.getint('k')
+        hidden_size = args.getint('hidden_size')
+        gamma = args.getfloat('gamma')
+        tau = args.getfloat('tau')
 
-        self.n_agents = args.n_agents
-        self.n_states = args.n_states
-        self.n_actions = args.n_actions
+        self.n_agents = args.getint('n_agents')
+        self.n_states = n_s
+        self.n_actions = n_a
 
         # Device
         self.device = device
@@ -74,12 +44,11 @@ class ImitationLearning(object):
         self.actor = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=args.actor_lr)
+        self.actor_optim = Adam(self.actor.parameters(), lr=args.getfloat('actor_lr'))
 
         # Constants
         self.gamma = gamma
         self.tau = tau
-
 
     def select_action(self, state):
         """
@@ -90,7 +59,7 @@ class ImitationLearning(object):
         :return:
         """
         self.actor.eval()  # Switch the actor network to Evaluation Mode.
-        mu = self.actor(state.delay_state, state.delay_gso) #.to(self.device)
+        mu = self.actor(state.delay_state, state.delay_gso)  # .to(self.device)
 
         # mu is (B, 1, nA, N), need (N, nA)
         mu = mu.permute(0, 1, 3, 2)
@@ -100,7 +69,7 @@ class ImitationLearning(object):
         mu = mu.data
         return mu
 
-        #return mu.clamp(-1, 1)  # TODO clamp action to what space?
+        # return mu.clamp(-1, 1)  # TODO clamp action to what space?
 
     def gradient_step(self, batch):
         """
@@ -140,7 +109,6 @@ class ImitationLearning(object):
         print('Saving model to {}'.format(actor_path))
         torch.save(self.actor.state_dict(), actor_path)
 
-
     def load_model(self, actor_path):
         """
         Load Actor Model from given paths.
@@ -152,14 +120,21 @@ class ImitationLearning(object):
             self.actor.load_state_dict(torch.load(actor_path).to(self.device))
 
 
-
-def train_cloning(env, args, device, debug=True):
-    memory = ReplayBuffer(max_size=args.buffer_size)
+def train_cloning(env, args, device):
+    debug = args.getboolean('debug')
+    memory = ReplayBuffer(max_size=args.getint('buffer_size'))
     learner = ImitationLearning(device, args)
 
     rewards = []
     total_numsteps = 0
     updates = 0
+
+    n_a = args.getint('n_actions')
+    n_agents = args.getint('n_agents')
+    batch_size = args.getint('batch_size')
+    updates_per_step = args.getint('updates_per_step')
+
+    best_avg_reward = -1.0 * np.Inf
 
     n_episodes = 10000
 
@@ -171,7 +146,6 @@ def train_cloning(env, args, device, debug=True):
         done = False
         policy_loss_sum = 0
         while not done:
-
             # action = learner.select_action(state)
             optimal_action = env.env.controller()
             # next_state, reward, done, _ = env.step(action.cpu().numpy())
@@ -189,15 +163,15 @@ def train_cloning(env, args, device, debug=True):
             # action is (N, nA), need (B, 1, nA, N)
             action = torch.Tensor(optimal_action).to(device)
             action = action.transpose(1, 0)
-            action = action.reshape((1, 1, args.n_actions, args.n_agents))
+            action = action.reshape((1, 1, n_a, n_agents))
 
             memory.insert(Transition(state, action, notdone, next_state, reward))
 
             state = next_state
 
-        if memory.curr_size > args.batch_size:
-            for _ in range(args.updates_per_step):
-                transitions = memory.sample(args.batch_size)
+        if memory.curr_size > batch_size:
+            for _ in range(updates_per_step):
+                transitions = memory.sample(batch_size)
                 batch = Transition(*zip(*transitions))
                 policy_loss = learner.gradient_step(batch)
                 policy_loss_sum += policy_loss
@@ -216,6 +190,7 @@ def train_cloning(env, args, device, debug=True):
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                     episode_reward += reward
                     state = next_state
+                    # env.render()
             rewards.append(episode_reward)
 
             if debug:
@@ -224,30 +199,11 @@ def train_cloning(env, args, device, debug=True):
                         i, updates,
                         total_numsteps,
                         rewards[-1],
-                        np.mean(rewards[-10:]), policy_loss_sum))
+                        np.mean(rewards[-20:]), policy_loss_sum))
+
+            best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
+
     env.close()
-    learner.save_model(args.env)
-
-
-def main():
-    # initialize gym env
-    env = gym.make(args.env)
-
-    if args.env == "FlockingRelative-v0":
-        env.env.set_num_agents(args.n_agents)
-        env.env.set_comm_radius(args.comm_radius)
-        env.env.set_initial_vmax(args.v_max)
-
-    # use seed
-    env.seed(args.seed)
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-
-    # initialize params tuple
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train_cloning(env, args, device)
-
-
-if __name__ == "__main__":
-    main()
+    if debug:
+        learner.save_model(args.get('env'))
+    return best_avg_reward

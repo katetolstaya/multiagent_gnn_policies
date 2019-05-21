@@ -1,9 +1,5 @@
-import argparse
 import numpy as np
 import os
-import random
-import gym
-import gym_flock
 
 import torch
 import torch.nn.functional as F
@@ -15,33 +11,8 @@ from replay_buffer import ReplayBuffer
 from replay_buffer import Transition
 from actor import Actor
 
-''' Parse Arguments'''
-parser = argparse.ArgumentParser(description='DAGGER Implementation')
-
-# learning parameters
-parser.add_argument('--batch_size', type=int, default=20, help='Batch size')
-parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffer Size')
-parser.add_argument('--updates_per_step', type=int, default=200, help='Updates per Batch')
-parser.add_argument('--seed', type=int, default=11, help='random_seed')
-parser.add_argument('--actor_lr', type=float, default=5e-5, help='learning rate for actor')
-
-# architecture parameters
-parser.add_argument('--k', type=int, default=2, help='k')
-parser.add_argument('--hidden_size', type=int, default=32, help='hidden layer size')
-parser.add_argument('--gamma', type=float, default=0.99, help='gamma')
-parser.add_argument('--tau', type=float, default=0.5, help='tau')
-
-# env parameters
-parser.add_argument('--env', type=str, default="FlockingRelative-v0", help='Gym environment to run')
-parser.add_argument('--v_max', type=float, default=3.0, help='maximum initial flock vel')
-parser.add_argument('--comm_radius', type=float, default=1.0, help='flock communication radius')
-parser.add_argument('--n_agents', type=int, default=100, help='n_agents')
-parser.add_argument('--n_actions', type=int, default=2, help='n_actions')
-parser.add_argument('--n_states', type=int, default=6, help='n_states')
-
-args = parser.parse_args()
-
-# TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
+#
+# # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
 
 class DAGGER(object):
@@ -53,28 +24,28 @@ class DAGGER(object):
         :param args: experiment arguments
         """
 
-        n_s = args.n_states
-        n_a = args.n_actions
-        k = args.k
-        hidden_size = args.hidden_size
-        gamma = args.gamma
-        tau = args.tau
+        n_s = args.getint('n_states')
+        n_a = args.getint('n_actions')
+        k = args.getint('k')
+        hidden_size = args.getint('hidden_size')
+        gamma = args.getfloat('gamma')
+        tau = args.getfloat('tau')
 
-        self.n_agents = args.n_agents
-        self.n_states = args.n_states
-        self.n_actions = args.n_actions
+        self.n_agents = args.getint('n_agents')
+        self.n_states = n_s
+        self.n_actions = n_a
 
         # Device
         self.device = device
 
-        hidden_layers = [ hidden_size, hidden_size]
+        hidden_layers = [hidden_size, hidden_size]
         ind_agg = 0  # int(len(hidden_layers) / 2)  # aggregate halfway
 
         # Define Networks
         self.actor = Actor(n_s, n_a, hidden_layers, k, ind_agg).to(self.device)
 
         # Define Optimizers
-        self.actor_optim = Adam(self.actor.parameters(), lr=args.actor_lr)
+        self.actor_optim = Adam(self.actor.parameters(), lr=args.getfloat('actor_lr'))
 
         # Constants
         self.gamma = gamma
@@ -150,9 +121,15 @@ class DAGGER(object):
             self.actor.load_state_dict(torch.load(actor_path).to(self.device))
 
 
-def train_dagger(env, args, device, debug=True):
-    memory = ReplayBuffer(max_size=args.buffer_size)
+def train_dagger(env, args, device):
+    debug = args.getboolean('debug')
+    memory = ReplayBuffer(max_size=args.getint('buffer_size'))
     learner = DAGGER(device, args)
+
+
+    n_a = args.getint('n_actions')
+    n_agents = args.getint('n_agents')
+    batch_size = args.getint('batch_size')
 
     rewards = []
     total_numsteps = 0
@@ -164,6 +141,8 @@ def train_dagger(env, args, device, debug=True):
     beta_coeff = 0.993
 
     best_avg_reward = -1.0 * np.Inf
+
+    return 0
 
     for i in range(n_episodes):
 
@@ -197,15 +176,15 @@ def train_dagger(env, args, device, debug=True):
             # action is (N, nA), need (B, 1, nA, N)
             optimal_action = torch.Tensor(optimal_action).to(device)
             optimal_action = optimal_action.transpose(1, 0)
-            optimal_action = optimal_action.reshape((1, 1, args.n_actions, args.n_agents))
+            optimal_action = optimal_action.reshape((1, 1, n_a, n_agents))
 
             memory.insert(Transition(state, optimal_action, notdone, next_state, reward))
 
             state = next_state
 
-        if memory.curr_size > args.batch_size:
-            for _ in range(args.updates_per_step):
-                transitions = memory.sample(args.batch_size)
+        if memory.curr_size > batch_size:
+            for _ in range(args.getint('updates_per_step')):
+                transitions = memory.sample(batch_size)
                 batch = Transition(*zip(*transitions))
                 policy_loss = learner.gradient_step(batch)
                 policy_loss_sum += policy_loss
@@ -224,7 +203,7 @@ def train_dagger(env, args, device, debug=True):
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
                     episode_reward += reward
                     state = next_state
-                    #env.render()
+                    # env.render()
             rewards.append(episode_reward)
 
             if debug:
@@ -239,29 +218,5 @@ def train_dagger(env, args, device, debug=True):
 
     env.close()
     if debug:
-        learner.save_model(args.env)
+        learner.save_model(args.get('env'))
     return best_avg_reward
-
-
-def main():
-    # initialize gym env
-    env = gym.make(args.env)
-
-    if args.env == "FlockingRelative-v0":
-        env.env.set_num_agents(args.n_agents)
-        env.env.set_comm_radius(args.comm_radius)
-        env.env.set_initial_vmax(args.v_max)
-
-    # use seed
-    env.seed(args.seed)
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-
-    # initialize params tuple
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(train_dagger(env, args, device))
-
-
-if __name__ == "__main__":
-    main()
