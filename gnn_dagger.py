@@ -142,7 +142,6 @@ def train_dagger(env, args, device):
 
     best_avg_reward = -1.0 * np.Inf
 
-    return 0
 
     for i in range(n_episodes):
 
