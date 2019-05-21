@@ -5,6 +5,7 @@ import random
 import gym
 import gym_flock
 import torch
+import sys
 
 from gnn_cloning import train_cloning
 from gnn_dagger import train_dagger
@@ -36,7 +37,8 @@ def run_experiment(args):
 
 
 def main():
-    config_file = path.join(path.dirname(__file__), "cfg/vel.cfg")
+    fname = sys.argv[1]
+    config_file = path.join(path.dirname(__file__), fname)
     config = configparser.ConfigParser()
     config.read(config_file)
 
