@@ -12,3 +12,10 @@
 
 ## Other code:
 - `python3 flocking_gym_test.py` provides test code for the Gym Flock environments
+
+## To Do
+- Plot centralized and decentralized baselines
+- Obstacle avoidance
+- Follow 1 or 2 leaders
+- Play with control costs
+- DDPG
