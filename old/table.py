@@ -1,6 +1,5 @@
-from gnn_dagger import train_dagger
+from learner.gnn_dagger import train_dagger
 import gym
-import gym_flock
 import random
 import numpy as np
 import torch

@@ -6,16 +6,15 @@ import torch.nn.functional as F
 from torch.optim import Adam
 from torch.autograd import Variable
 
-from state_with_delay import MultiAgentStateWithDelay
-from replay_buffer import ReplayBuffer
-from replay_buffer import Transition
-from actor import Actor
+from learner.state_with_delay import MultiAgentStateWithDelay
+from learner.replay_buffer import ReplayBuffer
+from learner.replay_buffer import Transition
+from learner.actor import Actor
 
-#
-# # TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
+# TODO: how to deal with bounded/unbounded action spaces?? Should I always assume bounded actions?
 
 
-class DAGGER(object):
+class ImitationLearning(object):
 
     def __init__(self, device, args):  # , n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
         """
@@ -121,31 +120,25 @@ class DAGGER(object):
             self.actor.load_state_dict(torch.load(actor_path).to(self.device))
 
 
-def train_dagger(env, args, device):
+def train_cloning(env, args, device):
     debug = args.getboolean('debug')
     memory = ReplayBuffer(max_size=args.getint('buffer_size'))
-    learner = DAGGER(device, args)
-
-
-    n_a = args.getint('n_actions')
-    n_agents = args.getint('n_agents')
-    batch_size = args.getint('batch_size')
+    learner = ImitationLearning(device, args)
 
     rewards = []
     total_numsteps = 0
     updates = 0
 
-    n_episodes = 800
-
-    beta = 1
-    beta_coeff = 0.993
+    n_a = args.getint('n_actions')
+    n_agents = args.getint('n_agents')
+    batch_size = args.getint('batch_size')
+    updates_per_step = args.getint('updates_per_step')
 
     best_avg_reward = -1.0 * np.Inf
 
+    n_episodes = 10000
 
     for i in range(n_episodes):
-
-        beta = max(beta * beta_coeff, 0.5)
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
@@ -153,15 +146,10 @@ def train_dagger(env, args, device):
         done = False
         policy_loss_sum = 0
         while not done:
-
+            # action = learner.select_action(state)
             optimal_action = env.env.controller()
-            if np.random.binomial(1, beta) > 0:
-                action = optimal_action
-            else:
-                action = learner.select_action(state)
-                action = action.cpu().numpy()
-
-            next_state, reward, done, _ = env.step(action)
+            # next_state, reward, done, _ = env.step(action.cpu().numpy())
+            next_state, reward, done, _ = env.step(optimal_action)
 
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
 
@@ -173,16 +161,16 @@ def train_dagger(env, args, device):
             reward = torch.Tensor([reward]).to(device)
 
             # action is (N, nA), need (B, 1, nA, N)
-            optimal_action = torch.Tensor(optimal_action).to(device)
-            optimal_action = optimal_action.transpose(1, 0)
-            optimal_action = optimal_action.reshape((1, 1, n_a, n_agents))
+            action = torch.Tensor(optimal_action).to(device)
+            action = action.transpose(1, 0)
+            action = action.reshape((1, 1, n_a, n_agents))
 
-            memory.insert(Transition(state, optimal_action, notdone, next_state, reward))
+            memory.insert(Transition(state, action, notdone, next_state, reward))
 
             state = next_state
 
         if memory.curr_size > batch_size:
-            for _ in range(args.getint('updates_per_step')):
+            for _ in range(updates_per_step):
                 transitions = memory.sample(batch_size)
                 batch = Transition(*zip(*transitions))
                 policy_loss = learner.gradient_step(batch)

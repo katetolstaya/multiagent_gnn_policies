@@ -7,8 +7,8 @@ import gym_flock
 import torch
 import sys
 
-from gnn_cloning import train_cloning
-from gnn_dagger import train_dagger
+from learner.gnn_cloning import train_cloning
+from learner.gnn_dagger import train_dagger
 
 
 def run_experiment(args):

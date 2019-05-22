@@ -3,18 +3,17 @@ import numpy as np
 import os
 import random
 import gym
-import gym_flock
 
 import torch
 import torch.nn.functional as F
 from torch.optim import Adam
 from torch.autograd import Variable
 
-from state_with_delay import MultiAgentStateWithDelay
-from replay_buffer import ReplayBuffer
-from replay_buffer import Transition
-from actor import Actor
-from critic import Critic
+from learner.state_with_delay import MultiAgentStateWithDelay
+from learner.replay_buffer import ReplayBuffer
+from learner.replay_buffer import Transition
+from learner.actor import Actor
+from learner.critic import Critic
 
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
