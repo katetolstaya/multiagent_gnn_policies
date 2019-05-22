@@ -3,7 +3,7 @@
 - Python 3
 - OpenAI Gym
 - PyTorch
-- Gym-flock
+- [Gym-Flock](https://github.com/katetolstaya/gym-flock)
 
 ## Available algorithms:
 - Behavior Cloning as described in [ArXiv](https://arxiv.org/abs/1903.10527) `python3 train.py cfg/cloning.cfg`
