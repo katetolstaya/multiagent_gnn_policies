@@ -42,8 +42,14 @@ def main():
     config = configparser.ConfigParser()
     config.read(config_file)
 
+    printed_header = False
+
     if config.sections():
         for section_name in config.sections():
+            if not printed_header:
+                print(config[section_name].get('header'))
+                printed_header = True
+
             val = run_experiment(config[section_name])
             print(section_name + ", " + str(val))
     else:
