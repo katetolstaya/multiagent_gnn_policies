@@ -1,6 +1,6 @@
 import itertools
 
-out_fname = 'vel2.cfg'
+out_fname = 'n.cfg'
 
 out_file = open(out_fname, "w")
 
@@ -13,7 +13,7 @@ out_file.write('\n')
 params = {}
 params['k'] = [1,2,3,4]
 params['seed'] = range(10)
-params['v_max'] = [0.5, 1.5, 2.5, 3.5]
+params['n_agents'] = [20, 40, 80, 100]
 #params['comm_radius'] = [3.0, 2.0, 1.5, 1.0]
 
 param_names = params.keys()

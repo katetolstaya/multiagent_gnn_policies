@@ -10,11 +10,11 @@ k_ind = 1
 v_ind = 0
 
 
-# fname = 'rad2.csv'
-# xlabel = 'Comm. Radius'
-# ylabel = 'Avg Cost'
-# k_ind = 0
-# v_ind = 2
+fname = 'rad3.csv'
+xlabel = 'Comm. Radius'
+ylabel = 'Avg Cost'
+k_ind = 0
+v_ind = 2
 
 
 title = ylabel + ' vs. ' + xlabel
