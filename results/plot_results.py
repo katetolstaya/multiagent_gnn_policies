@@ -10,11 +10,11 @@ k_ind = 1
 v_ind = 0
 
 
-fname = 'rad2.csv'
-xlabel = 'Comm. Radius'
-ylabel = 'Avg Cost'
-k_ind = 0
-v_ind = 2
+# fname = 'rad2.csv'
+# xlabel = 'Comm. Radius'
+# ylabel = 'Avg Cost'
+# k_ind = 0
+# v_ind = 2
 
 
 title = ylabel + ' vs. ' + xlabel
@@ -47,10 +47,22 @@ for k in list_costs.keys():
     for v in list_costs[k].keys():
         avg_costs[k][v] = np.mean(list_costs[k][v])
 
+# compute standard deviation
+std_costs = OrderedDict()
+for k in list_costs.keys():
+    if k not in std_costs:
+        std_costs[k] = OrderedDict()
+
+    for v in list_costs[k].keys():
+        std_costs[k][v] = np.std(list_costs[k][v])
+
+
 # plot
 fig, ax = plt.subplots()
 for k in avg_costs.keys():
-    ax.plot(avg_costs[k].keys(), avg_costs[k].values(), marker='o', label='K=' + str(k))
+#    ax.plot(avg_costs[k].keys(), avg_costs[k].values(), marker='o', label='K=' + str(k))
+    ax.errorbar(avg_costs[k].keys(), avg_costs[k].values(), yerr=std_costs[k].values(), marker='o', label='K=' + str(k))
+
 
 ax.legend()
 plt.title(title)

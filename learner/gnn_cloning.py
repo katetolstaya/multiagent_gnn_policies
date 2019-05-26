@@ -134,11 +134,12 @@ def train_cloning(env, args, device):
     batch_size = args.getint('batch_size')
     updates_per_step = args.getint('updates_per_step')
 
-    best_avg_reward = -1.0 * np.Inf
+    n_train_episodes = 800
+    test_frequency = 40
+    n_test_episodes = 20
 
-    n_episodes = 10000
 
-    for i in range(n_episodes):
+    for i in range(n_train_episodes):
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
@@ -177,11 +178,9 @@ def train_cloning(env, args, device):
                 policy_loss_sum += policy_loss
                 updates += 1
 
-        if i % 10 == 0:
-
+        if i % test_frequency == 0:
             episode_reward = 0
-            n_eps = 1
-            for n in range(n_eps):
+            for n in range(n_test_episodes):
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
                 done = False
                 while not done:
@@ -191,19 +190,19 @@ def train_cloning(env, args, device):
                     episode_reward += reward
                     state = next_state
                     # env.render()
-            rewards.append(episode_reward)
+            rewards.append(episode_reward/n_test_episodes)
 
-            if debug:
-                print(
-                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
-                        i, updates,
-                        total_numsteps,
-                        rewards[-1],
-                        np.mean(rewards[-20:]), policy_loss_sum))
-
-            best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
+            # if debug:
+            #     print(
+            #         "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
+            #             i, updates,
+            #             total_numsteps,
+            #             rewards[-1],
+            #             np.mean(rewards[-20:]), policy_loss_sum))
+            #
+            # best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
 
     env.close()
     if debug:
         learner.save_model(args.get('env'))
-    return best_avg_reward
+    return np.max(rewards)

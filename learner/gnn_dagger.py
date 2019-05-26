@@ -126,24 +126,21 @@ def train_dagger(env, args, device):
     memory = ReplayBuffer(max_size=args.getint('buffer_size'))
     learner = DAGGER(device, args)
 
-
     n_a = args.getint('n_actions')
     n_agents = args.getint('n_agents')
     batch_size = args.getint('batch_size')
 
+    n_train_episodes = args.getint('n_train_episodes')
+    beta_coeff = args.getfloat('beta_coeff')
+    test_interval = args.getint('test_interval')
+    n_test_episodes = args.getint('n_test_episodes')
+
     rewards = []
     total_numsteps = 0
     updates = 0
-
-    n_episodes = 800
-
     beta = 1
-    beta_coeff = 0.993
 
-    best_avg_reward = -1.0 * np.Inf
-
-
-    for i in range(n_episodes):
+    for i in range(n_train_episodes):
 
         beta = max(beta * beta_coeff, 0.5)
 
@@ -189,11 +186,9 @@ def train_dagger(env, args, device):
                 policy_loss_sum += policy_loss
                 updates += 1
 
-        if i % 10 == 0:
-
+        if i % test_interval == 0:
             episode_reward = 0
-            n_eps = 1
-            for n in range(n_eps):
+            for _ in range(n_test_episodes):
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
                 done = False
                 while not done:
@@ -203,19 +198,19 @@ def train_dagger(env, args, device):
                     episode_reward += reward
                     state = next_state
                     # env.render()
-            rewards.append(episode_reward)
+            rewards.append(episode_reward/n_test_episodes)
 
             if debug:
                 print(
-                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
+                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}".format(
                         i, updates,
                         total_numsteps,
                         rewards[-1],
-                        np.mean(rewards[-20:]), policy_loss_sum))
+                        policy_loss_sum))
 
-            best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
+            # best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
 
     env.close()
     if debug:
         learner.save_model(args.get('env'))
-    return best_avg_reward
+    return np.max(rewards)
