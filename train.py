@@ -9,6 +9,7 @@ import sys
 
 from learner.gnn_cloning import train_cloning
 from learner.gnn_dagger import train_dagger
+from learner.gnn_baseline import train_baseline
 
 
 def run_experiment(args):
@@ -34,6 +35,8 @@ def run_experiment(args):
         return train_dagger(env, args, device)
     elif alg == 'cloning':
         return train_cloning(env, args, device)
+    elif alg == 'baseline':
+        return train_baseline(env, args)
 
 
 def main():

@@ -146,7 +146,6 @@ def train_dagger(env, args, device):
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
-        episode_reward = 0
         done = False
         policy_loss_sum = 0
         while not done:
@@ -163,7 +162,6 @@ def train_dagger(env, args, device):
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
 
             total_numsteps += 1
-            episode_reward += reward
 
             # action = torch.Tensor(action)
             notdone = torch.Tensor([not done]).to(device)

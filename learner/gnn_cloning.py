@@ -134,16 +134,14 @@ def train_cloning(env, args, device):
     batch_size = args.getint('batch_size')
     updates_per_step = args.getint('updates_per_step')
 
-    n_train_episodes = 800
-    test_frequency = 40
-    n_test_episodes = 20
-
+    n_train_episodes = args.getint('n_train_episodes')
+    test_interval = args.getint('test_interval')
+    n_test_episodes = args.getint('n_test_episodes')
 
     for i in range(n_train_episodes):
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
 
-        episode_reward = 0
         done = False
         policy_loss_sum = 0
         while not done:
@@ -155,7 +153,6 @@ def train_cloning(env, args, device):
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
 
             total_numsteps += 1
-            episode_reward += reward
 
             # action = torch.Tensor(action)
             notdone = torch.Tensor([not done]).to(device)
@@ -178,7 +175,7 @@ def train_cloning(env, args, device):
                 policy_loss_sum += policy_loss
                 updates += 1
 
-        if i % test_frequency == 0:
+        if i % test_interval == 0:
             episode_reward = 0
             for n in range(n_test_episodes):
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
@@ -192,15 +189,14 @@ def train_cloning(env, args, device):
                     # env.render()
             rewards.append(episode_reward/n_test_episodes)
 
-            # if debug:
-            #     print(
-            #         "Episode: {}, updates: {}, total numsteps: {}, reward: {}, average reward: {}, policy loss: {}".format(
-            #             i, updates,
-            #             total_numsteps,
-            #             rewards[-1],
-            #             np.mean(rewards[-20:]), policy_loss_sum))
-            #
-            # best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
+            if debug:
+                print(
+                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}".format(
+                        i, updates,
+                        total_numsteps,
+                        rewards[-1],
+                        policy_loss_sum))
+
 
     env.close()
     if debug:
