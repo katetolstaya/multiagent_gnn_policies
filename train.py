@@ -17,7 +17,7 @@ def run_experiment(args):
     env_name = args.get('env')
     env = gym.make(env_name)
 
-    if env_name == "FlockingRelative-v0":
+    if isinstance(env.env, gym_flock.envs.FlockingRelativeEnv):
         env.env.params_from_cfg(args)
 
     # use seed

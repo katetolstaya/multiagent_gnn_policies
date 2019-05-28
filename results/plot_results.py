@@ -75,25 +75,25 @@ def get_stddev(list_costs):
 
     return std_costs
 
-# fname_baseline = 'vel4_baseline.csv'
-# k_ind_baseline = 2
-# v_ind_baseline = 0
-#
-# fname = 'vel2.csv'
-# xlabel = 'Max Initial Velocity'
-# ylabel = 'Avg Cost'
-# k_ind = 1
-# v_ind = 0
-
-fname_baseline = 'rad4_baseline.csv'
+fname_baseline = 'vel4_baseline.csv'
 k_ind_baseline = 2
 v_ind_baseline = 0
 
-fname = 'rad4.csv'
-xlabel = 'Comm. Radius'
+fname = 'vel2.csv'
+xlabel = 'Max Initial Velocity'
 ylabel = 'Avg Cost'
-k_ind = 0
-v_ind = 2
+k_ind = 1
+v_ind = 0
+
+# fname_baseline = 'rad4_baseline.csv'
+# k_ind_baseline = 2
+# v_ind_baseline = 0
+
+# fname = 'rad4.csv'
+# xlabel = 'Comm. Radius'
+# ylabel = 'Avg Cost'
+# k_ind = 0
+# v_ind = 2
 
 
 title = ylabel + ' vs. ' + xlabel
