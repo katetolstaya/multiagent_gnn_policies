@@ -118,7 +118,8 @@ class DAGGER(object):
         """
         print('Loading model from {}'.format(actor_path))
         if actor_path is not None:
-            self.actor.load_state_dict(torch.load(actor_path).to(self.device))
+            self.actor.load_state_dict(torch.load(actor_path))
+            self.actor.to(self.device)
 
 
 def train_dagger(env, args, device):
@@ -209,6 +210,6 @@ def train_dagger(env, args, device):
             # best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
 
     env.close()
-    if debug:
-        learner.save_model(args.get('env'))
+    if debug and args.get('fname'):
+        learner.save_model(args.get('env'), suffix=args.get('fname'))
     return np.max(rewards)

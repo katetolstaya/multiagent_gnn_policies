@@ -1,7 +1,7 @@
 import gym
 import gym_flock
 
-env_name = "FlockingLeader-v0"
+env_name = "FlockingObstacle-v0"
 env = gym.make(env_name)
 
 while True:
