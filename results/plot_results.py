@@ -75,25 +75,26 @@ def get_stddev(list_costs):
 
     return std_costs
 
-# fname_baseline = 'vel4_baseline.csv'
-# k_ind_baseline = 2
-# v_ind_baseline = 0
-
-# fname = 'vel2.csv'
-# xlabel = 'Max Initial Velocity'
-# ylabel = 'Avg Cost'
-# k_ind = 1
-# v_ind = 0
-
-fname_baseline = 'rad4_baseline.csv'
+baseline=False
+fname_baseline = 'vel4_baseline.csv'
 k_ind_baseline = 2
 v_ind_baseline = 0
 
-fname = 'rad4.csv'
-xlabel = 'Comm. Radius'
+fname = 'vel_leader.csv'
+xlabel = 'Max Initial Velocity'
 ylabel = 'Avg Cost'
-k_ind = 0
-v_ind = 2
+k_ind = 1
+v_ind = 0
+
+# fname_baseline = 'rad4_baseline.csv'
+# k_ind_baseline = 2
+# v_ind_baseline = 0
+#
+# fname = 'rad4.csv'
+# xlabel = 'Comm. Radius'
+# ylabel = 'Avg Cost'
+# k_ind = 0
+# v_ind = 2
 
 
 title = ylabel + ' vs. ' + xlabel
@@ -102,20 +103,23 @@ list_costs = get_dict(fname, k_ind, v_ind)
 avg_costs = get_mean(list_costs)
 std_costs = get_stddev(list_costs)
 
-list_costs_baseline = get_dict_baseline(fname_baseline, k_ind_baseline, v_ind_baseline)
-avg_costs_baseline = get_mean(list_costs_baseline)
-std_costs_baseline = get_stddev(list_costs_baseline)
+
 
 # plot
 fig, ax = plt.subplots()
 for k in avg_costs.keys():
     ax.errorbar(avg_costs[k].keys(), avg_costs[k].values(), yerr=std_costs[k].values(), marker='o', label='K=' + str(k))
 
-for k in avg_costs_baseline.keys():
 
-    if k is 'Centralized':
-	    ax.errorbar(avg_costs_baseline[k].keys(), avg_costs_baseline[k].values(), yerr=std_costs_baseline[k].values(),
-	                marker='o', label=k)
+if baseline:
+    list_costs_baseline = get_dict_baseline(fname_baseline, k_ind_baseline, v_ind_baseline)
+    avg_costs_baseline = get_mean(list_costs_baseline)
+    std_costs_baseline = get_stddev(list_costs_baseline)
+
+    for k in avg_costs_baseline.keys():
+        if k is 'Centralized':
+            ax.errorbar(avg_costs_baseline[k].keys(), avg_costs_baseline[k].values(), yerr=std_costs_baseline[k].values(),
+                        marker='o', label=k)
 
 
 ax.legend()
