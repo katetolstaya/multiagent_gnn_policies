@@ -75,8 +75,29 @@ def get_stddev(list_costs):
 
     return std_costs
 
-baseline=False
-fname_baseline = 'vel4_baseline.csv'
+def get_max(list_costs):
+    # compute average over diff seeds for each parameter combo
+    max_val = -1.0 * np.Inf
+
+    for k in list_costs.keys():
+        for v in list_costs[k].keys():
+            for i in list_costs[k][v]:
+                max_val = np.maximum(max_val, i)
+    return max_val
+
+# baseline=True
+# fname_baseline = 'vel4_baseline.csv'
+# k_ind_baseline = 2
+# v_ind_baseline = 0
+#
+# fname = 'vel4.csv'
+# xlabel = 'Max Initial Velocity'
+# ylabel = 'Avg Cost'
+# k_ind = 1
+# v_ind = 0
+
+baseline=True
+fname_baseline = 'vel_leader_ baseline.csv'
 k_ind_baseline = 2
 v_ind_baseline = 0
 
@@ -90,20 +111,33 @@ v_ind = 0
 # k_ind_baseline = 2
 # v_ind_baseline = 0
 #
+
 # fname = 'rad4.csv'
 # xlabel = 'Comm. Radius'
 # ylabel = 'Avg Cost'
 # k_ind = 0
 # v_ind = 2
+#
+#
+#
+# baseline=True
+# fname = 'rad_leader.csv'
+# xlabel = 'Comm. Radius'
+# ylabel = 'Avg Cost'
+# k_ind = 0
+# v_ind = 2
+#
+# fname_baseline = 'rad_leader_baseline.csv'
+# k_ind_baseline = 2
+# v_ind_baseline = 0
 
-
-title = ylabel + ' vs. ' + xlabel
-
+#
 list_costs = get_dict(fname, k_ind, v_ind)
 avg_costs = get_mean(list_costs)
 std_costs = get_stddev(list_costs)
 
-
+max_val = get_max(list_costs) + 10.0
+title = ylabel + ' vs. ' + xlabel
 
 # plot
 fig, ax = plt.subplots()
@@ -117,13 +151,13 @@ if baseline:
     std_costs_baseline = get_stddev(list_costs_baseline)
 
     for k in avg_costs_baseline.keys():
-        if k is 'Centralized':
-            ax.errorbar(avg_costs_baseline[k].keys(), avg_costs_baseline[k].values(), yerr=std_costs_baseline[k].values(),
-                        marker='o', label=k)
+        ax.errorbar(avg_costs_baseline[k].keys(), avg_costs_baseline[k].values(), yerr=std_costs_baseline[k].values(),
+                    marker='o', label=k)
 
 
 ax.legend()
 plt.title(title)
+plt.ylim(top=max_val, bottom=0)
 
 plt.xlabel(xlabel)
 plt.ylabel(ylabel)
