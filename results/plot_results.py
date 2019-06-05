@@ -85,36 +85,35 @@ def get_max(list_costs):
                 max_val = np.maximum(max_val, i)
     return max_val
 
+baseline=True
+fname_baseline = 'vel4_baseline.csv'
+k_ind_baseline = 2
+v_ind_baseline = 0
+
+fname = 'vel4.csv'
+xlabel = 'Max Initial Velocity'
+
+k_ind = 1
+v_ind = 0
+
 # baseline=True
-# fname_baseline = 'vel4_baseline.csv'
+# fname_baseline = 'vel_leader_ baseline.csv'
 # k_ind_baseline = 2
 # v_ind_baseline = 0
-#
-# fname = 'vel4.csv'
+
+# fname = 'vel_leader.csv'
 # xlabel = 'Max Initial Velocity'
 # ylabel = 'Avg Cost'
 # k_ind = 1
 # v_ind = 0
 
-baseline=True
-fname_baseline = 'vel_leader_ baseline.csv'
-k_ind_baseline = 2
-v_ind_baseline = 0
-
-fname = 'vel_leader.csv'
-xlabel = 'Max Initial Velocity'
-ylabel = 'Avg Cost'
-k_ind = 1
-v_ind = 0
-
 # fname_baseline = 'rad4_baseline.csv'
 # k_ind_baseline = 2
 # v_ind_baseline = 0
-#
+
 
 # fname = 'rad4.csv'
 # xlabel = 'Comm. Radius'
-# ylabel = 'Avg Cost'
 # k_ind = 0
 # v_ind = 2
 #
@@ -123,7 +122,6 @@ v_ind = 0
 # baseline=True
 # fname = 'rad_leader.csv'
 # xlabel = 'Comm. Radius'
-# ylabel = 'Avg Cost'
 # k_ind = 0
 # v_ind = 2
 #
@@ -131,12 +129,15 @@ v_ind = 0
 # k_ind_baseline = 2
 # v_ind_baseline = 0
 
+
+
 #
 list_costs = get_dict(fname, k_ind, v_ind)
 avg_costs = get_mean(list_costs)
 std_costs = get_stddev(list_costs)
 
 max_val = get_max(list_costs) + 10.0
+ylabel = 'Average Cost'
 title = ylabel + ' vs. ' + xlabel
 
 # plot
