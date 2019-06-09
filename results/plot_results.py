@@ -3,6 +3,8 @@ import csv
 import numpy as np
 from collections import OrderedDict
 
+colors={'Centralized':'green', 'Decentralized':'red', '4':'blue', '3':'darkviolet', '2':'orange', '1':'gold'}
+plt.rcParams["font.family"] = "Serif"
 
 def get_dict(fname, k_ind, v_ind):
     list_costs = OrderedDict()
@@ -91,7 +93,7 @@ k_ind_baseline = 2
 v_ind_baseline = 0
 
 fname = 'vel4.csv'
-xlabel = 'Max Initial Velocity'
+xlabel = 'Maximum Initial Velocity'
 
 k_ind = 1
 v_ind = 0
@@ -110,16 +112,14 @@ v_ind = 0
 # fname_baseline = 'rad4_baseline.csv'
 # k_ind_baseline = 2
 # v_ind_baseline = 0
-
-
+#
+#
 # fname = 'rad4.csv'
 # xlabel = 'Comm. Radius'
 # k_ind = 0
 # v_ind = 2
-#
-#
-#
-# baseline=True
+
+
 # fname = 'rad_leader.csv'
 # xlabel = 'Comm. Radius'
 # k_ind = 0
@@ -128,6 +128,19 @@ v_ind = 0
 # fname_baseline = 'rad_leader_baseline.csv'
 # k_ind_baseline = 2
 # v_ind_baseline = 0
+
+
+# fname_baseline = 'n_baseline.csv'
+# k_ind_baseline = 1
+# v_ind_baseline = 2
+#
+#
+# fname = 'n.csv'
+# xlabel = 'Number of Agents'
+# k_ind = 0
+# v_ind = 2
+
+
 
 
 
@@ -143,7 +156,7 @@ title = ylabel + ' vs. ' + xlabel
 # plot
 fig, ax = plt.subplots()
 for k in avg_costs.keys():
-    ax.errorbar(avg_costs[k].keys(), avg_costs[k].values(), yerr=std_costs[k].values(), marker='o', label='K=' + str(k))
+    ax.errorbar(avg_costs[k].keys(), avg_costs[k].values(), yerr=std_costs[k].values(), marker='o', color=colors[str(k)], label='K=' + str(k))
 
 
 if baseline:
@@ -153,7 +166,7 @@ if baseline:
 
     for k in avg_costs_baseline.keys():
         ax.errorbar(avg_costs_baseline[k].keys(), avg_costs_baseline[k].values(), yerr=std_costs_baseline[k].values(),
-                    marker='o', label=k)
+                    marker='o', color=colors[str(k)], label=k)
 
 
 ax.legend()
@@ -163,4 +176,8 @@ plt.ylim(top=max_val, bottom=0)
 plt.xlabel(xlabel)
 plt.ylabel(ylabel)
 
+plt.savefig('vel.eps', format='eps')
+
 plt.show()
+
+
