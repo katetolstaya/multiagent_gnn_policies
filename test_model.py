@@ -14,6 +14,7 @@ from learner.gnn_dagger import DAGGER
 def test(args):
     # initialize gym env
     env_name = args.get('env')
+    env_name = "FlockingObstacle-v0"
     env = gym.make(env_name)
 
     if isinstance(env.env, gym_flock.envs.FlockingRelativeEnv):
@@ -30,6 +31,7 @@ def test(args):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     learner = DAGGER(device, args)
     n_test_episodes = args.getint('n_test_episodes')
+    # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
     actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
 
     learner.load_model(actor_path)

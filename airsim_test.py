@@ -2,7 +2,7 @@ import gym
 import gym_flock
 import configparser
 
-env_name = "FlockingAirsimAccel-v0"
+env_name = "FlockingAirsim-v0"
 env = gym.make(env_name)
 config_file = 'cfg/airsim_dagger.cfg'
 
@@ -19,7 +19,6 @@ while True:
         next_state, reward, done, _ = env.step(action)
         episode_reward += reward
         state = next_state
-        done = False
         #env.render()
 
     print(episode_reward)
