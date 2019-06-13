@@ -14,7 +14,7 @@ from learner.gnn_dagger import DAGGER
 def test(args):
     # initialize gym env
     env_name = args.get('env')
-    env_name = "FlockingObstacle-v0"
+    env_name = "FlockingAirsimAccel-v0"
     env = gym.make(env_name)
 
     if isinstance(env.env, gym_flock.envs.FlockingRelativeEnv):
@@ -32,7 +32,8 @@ def test(args):
     learner = DAGGER(device, args)
     n_test_episodes = args.getint('n_test_episodes')
     # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
-    actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
+    # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
+    actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch'
 
     learner.load_model(actor_path)
 
@@ -46,7 +47,7 @@ def test(args):
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
             episode_reward += reward
             state = next_state
-            env.render()
+            #env.render()
         print(episode_reward)
     env.close()
 
