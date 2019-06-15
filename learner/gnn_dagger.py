@@ -218,4 +218,4 @@ def train_dagger(env, args, device):
                         policy_loss_sum))
 
     env.close()
-    return
+    return stats
