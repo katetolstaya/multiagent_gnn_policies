@@ -32,11 +32,14 @@ def run_experiment(args):
 
     alg = args.get('alg').lower()
     if alg == 'dagger':
-        return train_dagger(env, args, device)
+        stats = train_dagger(env, args, device)
     elif alg == 'cloning':
-        return train_cloning(env, args, device)
+        stats = train_cloning(env, args, device)
     elif alg == 'baseline':
-        return train_baseline(env, args)
+        stats = train_baseline(env, args)
+    else:
+        raise Exception('Invalid algorithm/mode name')
+    return stats
 
 
 def main():
@@ -53,8 +56,8 @@ def main():
                 print(config[section_name].get('header'))
                 printed_header = True
 
-            val = run_experiment(config[section_name])
-            print(section_name + ", " + str(val))
+            stats = run_experiment(config[section_name])
+            print(section_name + ", " + str(stats['mean']) + ", " + str(stats['std']))
     else:
         val = run_experiment(config[config.default_section])
         print(val)

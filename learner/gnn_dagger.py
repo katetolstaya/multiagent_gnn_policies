@@ -17,7 +17,7 @@ from learner.actor import Actor
 
 class DAGGER(object):
 
-    def __init__(self, device, args):  # , n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
+    def __init__(self, device, args, k=None):  # , n_s, n_a, k, device, hidden_size=32, gamma=0.99, tau=0.5):
         """
         Initialize the DDPG networks.
         :param device: CUDA device for torch
@@ -26,7 +26,7 @@ class DAGGER(object):
 
         n_s = args.getint('n_states')
         n_a = args.getint('n_actions')
-        k = args.getint('k')
+        k = k or args.getint('k')
         hidden_size = args.getint('hidden_size')
         gamma = args.getfloat('gamma')
         tau = args.getfloat('tau')
@@ -136,10 +136,11 @@ def train_dagger(env, args, device):
     test_interval = args.getint('test_interval')
     n_test_episodes = args.getint('n_test_episodes')
 
-    rewards = []
     total_numsteps = 0
     updates = 0
     beta = 1
+
+    stats = {'mean': -1.0 * np.Inf, 'std': 0}
 
     for i in range(n_train_episodes):
 
@@ -186,30 +187,35 @@ def train_dagger(env, args, device):
                 updates += 1
 
         if i % test_interval == 0:
-            episode_reward = 0
+            test_rewards = []
             for _ in range(n_test_episodes):
+                ep_reward = 0
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
                 done = False
                 while not done:
                     action = learner.select_action(state)
                     next_state, reward, done, _ = env.step(action.cpu().numpy())
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
-                    episode_reward += reward
+                    ep_reward += reward
                     state = next_state
                     # env.render()
-            rewards.append(episode_reward/n_test_episodes)
+                test_rewards.append(ep_reward)
+
+            mean_reward = np.mean(test_rewards)
+            if stats['mean'] < mean_reward:
+                stats['mean'] = mean_reward
+                stats['std'] = np.std(test_rewards)
+
+                if debug and args.get('fname'):  # save the best model
+                    learner.save_model(args.get('env'), suffix=args.get('fname'))
 
             if debug:
                 print(
                     "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}".format(
                         i, updates,
                         total_numsteps,
-                        rewards[-1],
+                        mean_reward,
                         policy_loss_sum))
 
-            # best_avg_reward = max(best_avg_reward, np.mean(rewards[-20:]))
-
     env.close()
-    if debug and args.get('fname'):
-        learner.save_model(args.get('env'), suffix=args.get('fname'))
-    return np.max(rewards)
+    return

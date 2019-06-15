@@ -1,9 +1,36 @@
 import itertools
 
-default_fname = "default_baseline.cfg"
+baseline = False
+baseline = True
+param = 'vel'
+param = 'dt'
+# param = 'n'
+# param = 'rad'
 
-out_fname = 'vel_baseline.cfg'
-# out_fname = 'n_baseline.cfg'
+params = {}
+
+# params['seed'] = range(10)
+
+if baseline:
+    default_fname = "default_baseline.cfg"
+    out_fname = param + '_baseline.cfg'
+
+    params['centralized'] = ['True', 'False']
+else:
+    default_fname = 'default.cfg'
+    out_fname = param + '.cfg'
+
+    params['k'] = [1, 2, 3, 4]
+
+if param == 'vel':
+    params['v_max'] = [0.5, 1.5, 2.5, 3.5, 4.5]
+elif param == 'rad':
+    params['comm_radius'] = [3.0, 2.5, 2.0, 1.5, 1.0]
+elif param == 'n':
+    params['n_agents'] = [25, 50, 75, 100, 125, 150, 175, 200]
+elif param == 'dt':
+    params['dt'] = [0.1, 0.075, 0.05, 0.025, 0.01, 0.0075]
+
 
 out_file = open(out_fname, "w")
 
@@ -12,13 +39,6 @@ with open(default_fname) as f:
         out_file.write(line)
 
 out_file.write('\n')
-
-params = {}
-params['centralized'] = ['True', 'False']
-params['seed'] = range(10)
-# params['n_agents'] = [20, 40, 80, 100]
-# params['comm_radius'] = [3.0, 2.0, 1.5, 1.0]
-params['v_max'] = [0.5, 1.5, 2.5, 3.5]
 
 param_names = params.keys()
 param_values = params.values()

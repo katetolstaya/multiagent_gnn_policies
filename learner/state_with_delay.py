@@ -3,7 +3,7 @@ import numpy as np
 
 class MultiAgentStateWithDelay(object):
 
-    def __init__(self, device, args, env_state, prev_state=None):
+    def __init__(self, device, args, env_state, prev_state=None, k=None):
         """
         Create the state object that keeps track of the current state and GSO and history information
         :param device: CUDA device to use with PyTorch
@@ -13,7 +13,7 @@ class MultiAgentStateWithDelay(object):
         """
         n_states = args.getint('n_states')
         n_agents = args.getint('n_agents')
-        k = args.getint('k')
+        k = k or args.getint('k')
         # n_states = args.n_states
         # n_agents = args.n_agents
         # k = args.k

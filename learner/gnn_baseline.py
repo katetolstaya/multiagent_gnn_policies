@@ -7,39 +7,43 @@ def train_baseline(env, args):
     test_interval = args.getint('test_interval')
     n_test_episodes = args.getint('n_test_episodes')
     centralized = args.getboolean('centralized')
-
-    rewards = []
     total_numsteps = 0
 
+    stats = {'mean': -1.0 * np.Inf, 'std': 0}
     for i in range(n_train_episodes):
-        env.reset()
-
-        # episode_reward = 0
-        done = False
-        while not done:
-
-            action = env.env.controller(centralized)
-            next_state, reward, done, _ = env.step(action)
-            total_numsteps += 1
+        # env.reset()
+        # # episode_reward = 0
+        # done = False
+        # while not done:
+        #
+        #     action = env.env.controller(centralized)
+        #     next_state, reward, done, _ = env.step(action)
+        #     total_numsteps += 1
 
         if i % test_interval == 0:
-            episode_reward = 0
+            test_rewards = []
             for _ in range(n_test_episodes):
+                ep_reward = 0
                 env.reset()
                 done = False
                 while not done:
                     action = env.env.controller(centralized)
                     next_state, reward, done, _ = env.step(action)
-                    episode_reward += reward
+                    ep_reward += reward
+                    # env.render()
+                test_rewards.append(ep_reward)
 
-            rewards.append(episode_reward/n_test_episodes)
+            mean_reward = np.mean(test_rewards)
+            if stats['mean'] < mean_reward:
+                stats['mean'] = mean_reward
+                stats['std'] = np.std(test_rewards)
 
             if debug:
                 print(
                     "Episode: {}, total numsteps: {}, reward: {}".format(
                         i,
                         total_numsteps,
-                        rewards[-1]))
+                        mean_reward))
 
     env.close()
-    return np.max(rewards)
+    return stats

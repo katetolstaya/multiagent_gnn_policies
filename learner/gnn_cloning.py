@@ -138,6 +138,8 @@ def train_cloning(env, args, device):
     test_interval = args.getint('test_interval')
     n_test_episodes = args.getint('n_test_episodes')
 
+    stats = {'mean': -1.0 * np.Inf, 'std': 0}
+
     for i in range(n_train_episodes):
 
         state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
@@ -176,29 +178,36 @@ def train_cloning(env, args, device):
                 updates += 1
 
         if i % test_interval == 0:
-            episode_reward = 0
-            for n in range(n_test_episodes):
+            test_rewards = []
+            for _ in range(n_test_episodes):
+                ep_reward = 0
                 state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
                 done = False
                 while not done:
                     action = learner.select_action(state)
                     next_state, reward, done, _ = env.step(action.cpu().numpy())
                     next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
-                    episode_reward += reward
+                    ep_reward += reward
                     state = next_state
                     # env.render()
-            rewards.append(episode_reward/n_test_episodes)
+                test_rewards.append(ep_reward)
+
+            mean_reward = np.mean(test_rewards)
+            if stats['mean'] < mean_reward:
+                stats['mean'] = mean_reward
+                stats['std'] = np.std(test_rewards)
+
+                if debug and args.get('fname'):  # save the best model
+                    learner.save_model(args.get('env'), suffix=args.get('fname'))
 
             if debug:
                 print(
                     "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}".format(
                         i, updates,
                         total_numsteps,
-                        rewards[-1],
+                        mean_reward,
                         policy_loss_sum))
 
 
     env.close()
-    if debug:
-        learner.save_model(args.get('env'))
-    return np.max(rewards)
+    return stats
