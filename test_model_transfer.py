@@ -32,7 +32,7 @@ def test(args, actor_path, k):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     learner = DAGGER(device, args, k=k)
     n_test_episodes = args.getint('n_test_episodes')
-    learner.load_model(actor_path)
+    learner.load_model(actor_path, map_location=device)
 
     stats = {'mean': -1.0 * np.Inf, 'std': 0}
 
@@ -60,12 +60,18 @@ def test(args, actor_path, k):
 
 
 def main():
-    actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch2'
-    k = 2
 
     # fname = sys.argv[1]
 
-    fname = 'cfg/dagger_stoch.cfg'
+
+    # actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch2'
+    # k = 2
+    # fname = 'cfg/dagger_stoch.cfg'
+
+
+    base_actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer'
+    k=3
+    fname = 'cfg/n.cfg'
 
     config_file = path.join(path.dirname(__file__), fname)
     config = configparser.ConfigParser()
@@ -79,9 +85,12 @@ def main():
                 print(config[section_name].get('header'))
                 printed_header = True
 
+            k = config[section_name].getint('k')
+            actor_path = base_actor_path + str(k)
             stats = test(config[section_name], actor_path, k=k)
             print(section_name + ", " + str(stats['mean']) + ", " + str(stats['std']))
     else:
+        actor_path = base_actor_path + str(k)
         stats = test(config[config.default_section], actor_path, k=k)
         print(str(stats['mean']) + ", " + str(stats['std']))
 

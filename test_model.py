@@ -35,7 +35,7 @@ def test(args):
     # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
     actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch2'
 
-    learner.load_model(actor_path)
+    learner.load_model(actor_path, device)
 
     for _ in range(n_test_episodes):
         episode_reward = 0

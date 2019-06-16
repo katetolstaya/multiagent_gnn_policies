@@ -110,15 +110,15 @@ class DAGGER(object):
         print('Saving model to {}'.format(actor_path))
         torch.save(self.actor.state_dict(), actor_path)
 
-    def load_model(self, actor_path):
+    def load_model(self, actor_path, map_location):
         """
         Load Actor Model from given paths.
         :param actor_path: The actor path.
         :return: None
         """
-        print('Loading model from {}'.format(actor_path))
+        # print('Loading model from {}'.format(actor_path))
         if actor_path is not None:
-            self.actor.load_state_dict(torch.load(actor_path))
+            self.actor.load_state_dict(torch.load(actor_path, map_location))
             self.actor.to(self.device)
 
 
