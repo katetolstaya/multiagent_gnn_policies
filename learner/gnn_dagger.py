@@ -186,7 +186,7 @@ def train_dagger(env, args, device):
                 policy_loss_sum += policy_loss
                 updates += 1
 
-        if i % test_interval == 0:
+        if i % test_interval == 0 and debug:
             test_rewards = []
             for _ in range(n_test_episodes):
                 ep_reward = 0
@@ -202,12 +202,12 @@ def train_dagger(env, args, device):
                 test_rewards.append(ep_reward)
 
             mean_reward = np.mean(test_rewards)
-            if stats['mean'] < mean_reward:
-                stats['mean'] = mean_reward
-                stats['std'] = np.std(test_rewards)
-
-                if debug and args.get('fname'):  # save the best model
-                    learner.save_model(args.get('env'), suffix=args.get('fname'))
+            # if stats['mean'] < mean_reward:
+            #     stats['mean'] = mean_reward
+            #     stats['std'] = np.std(test_rewards)
+            #
+            #     if debug and args.get('fname'):  # save the best model
+            #         learner.save_model(args.get('env'), suffix=args.get('fname'))
 
             if debug:
                 print(
@@ -216,6 +216,27 @@ def train_dagger(env, args, device):
                         total_numsteps,
                         mean_reward,
                         policy_loss_sum))
+
+    test_rewards = []
+    for _ in range(n_test_episodes):
+        ep_reward = 0
+        state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None)
+        done = False
+        while not done:
+            action = learner.select_action(state)
+            next_state, reward, done, _ = env.step(action.cpu().numpy())
+            next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
+            ep_reward += reward
+            state = next_state
+            # env.render()
+        test_rewards.append(ep_reward)
+
+    mean_reward = np.mean(test_rewards)
+    stats['mean'] = mean_reward
+    stats['std'] = np.std(test_rewards)
+
+    if debug and args.get('fname'):  # save the best model
+        learner.save_model(args.get('env'), suffix=args.get('fname'))
 
     env.close()
     return stats
