@@ -14,7 +14,7 @@ _DECENTRALIZED = 'Decentr.'
 
 def main():
 
-    fig_fname = 'transfer_leader_vel'
+    fig_fname = 'transfer_n'
 
     if fig_fname == 'vel':
         fnames = ['vel.csv', 'vel_baseline.csv']
@@ -42,8 +42,8 @@ def main():
         k_ind = 0
         v_ind = 1
 
-        arrow_params = {'x':70, 'y': 400.0, 'dx':0.0, 'dy':30.0, 'width':1.5, 'head_length':30, 'color':'r'}
-        text_params = {'x': 55, 'y': 370}
+        arrow_params = {'x':105, 'y': 230.0, 'dx':0.0, 'dy':25.0, 'width':1.5, 'head_length':30, 'color':'r'}
+        text_params = {'x': 85, 'y': 200}
 
     if fig_fname == 'transfer_leader_vel':
         fnames = ['transfer_leader_vel.csv', 'vel_leader_baseline.csv']
@@ -59,6 +59,15 @@ def main():
         v_ind = 1
 
         arrow_params = None
+
+    if fig_fname == 'n':
+        fnames = ['n.csv', 'n_baseline.csv']
+        xlabel = 'Number of Agents'
+        k_ind = 0
+        v_ind = 1
+
+        arrow_params = {'x':85, 'y': 300.0, 'dx':0.0, 'dy':30.0, 'width':1.5, 'head_length':30, 'color':'r'}
+        text_params = {'x': 70, 'y': 370}
 
 
     colors = {_CENTRALIZED: 'green', _DECENTRALIZED: 'red', '4': 'blue', '3': 'darkviolet', '2': 'orange', '1': 'gold'}
@@ -122,6 +131,9 @@ def get_dict(fnames, k_ind, v_ind):
                         k = _DECENTRALIZED
 
                     v = float(row[v_ind])
+                    if v <30:
+                        continue
+
                     mean = float(row[2]) * -1.0
                     std = float(row[3])
                     if k not in mean_costs:

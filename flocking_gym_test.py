@@ -2,11 +2,15 @@ import gym
 import gym_flock
 import configparser
 
+
+env_name = "FlockingTwoFlocks-v0"
+config_file = 'cfg/n_twoflocks.cfg'
+
 # env_name = "FlockingRelative-v0"
 # config_file = 'cfg/dagger.cfg'
 #
-env_name = "FlockingAirsimAccel-v0"
-config_file = 'cfg/airsim_dagger.cfg'
+# env_name = "FlockingAirsimAccel-v0"
+# config_file = 'cfg/airsim_dagger.cfg'
 
 # env_name = 'FlockingStochastic-v0'
 # config_file = 'cfg/dagger_stoch.cfg'
@@ -25,7 +29,7 @@ while True:
         next_state, reward, done, _ = env.step(action)
         episode_reward += reward
         state = next_state
-        # env.render()
+        env.render()
 
     print(episode_reward)
 
