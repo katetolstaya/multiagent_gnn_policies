@@ -5,18 +5,22 @@ import random
 import gym
 import gym_flock
 import torch
-import sys
+# import sys
 
 from learner.state_with_delay import MultiAgentStateWithDelay
 from learner.gnn_dagger import DAGGER
 
-import seaborn as sns
+# import seaborn as sns
+import matplotlib
 from matplotlib import pyplot as plt
 
-# font = {'family': 'sans-serif',
-#         'weight': 'bold',
-#         'size': 14}
+font = {'family': 'serif',
+        'weight': 'bold',
+        'size': 14}
 
+matplotlib.rc('font', **font)
+
+save_dir = 'results/fig/'
 
 
 def test(args, actor_path, k):
@@ -43,7 +47,7 @@ def test(args, actor_path, k):
 
     learner.load_model(actor_path, device)
 
-    n_steps = 1000
+    n_steps = 500
 
     steps = np.zeros((n_steps,))
     min_dists_mean = np.zeros((n_steps,))
@@ -55,7 +59,7 @@ def test(args, actor_path, k):
     episode_reward = 0
     state = MultiAgentStateWithDelay(device, args, env.reset(), prev_state=None, k=k)
 
-    for step in range(0,n_steps):
+    for step in range(0, n_steps):
         action = learner.select_action(state)
         next_state, reward, done, _ = env.step(action.cpu().numpy())
 
@@ -73,7 +77,10 @@ def test(args, actor_path, k):
         next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state, k=k)
         episode_reward += reward
         state = next_state
-        # env.render()
+
+        if step % 100 == 0:
+            env.render()
+            plt.savefig(save_dir + 'traj' + str(step) + '.eps', format='eps')
 
     plt.ioff()
 
@@ -86,6 +93,8 @@ def test(args, actor_path, k):
     plt.fill_between(steps, y_min, y_max, color='lightblue')
     plt.xlabel('Step')
     plt.ylabel('Min. Distances')
+    plt.tight_layout()
+    plt.savefig(save_dir + 'min_dist.eps', format='eps')
     plt.show()
 
     y = vel_diffs_mean
@@ -97,6 +106,8 @@ def test(args, actor_path, k):
     plt.fill_between(steps, y_min, y_max, color='orange')
     plt.xlabel('Step')
     plt.ylabel('Velocity Diff.')
+    plt.tight_layout()
+    plt.savefig(save_dir + 'vel_diff.eps', format='eps')
     plt.show()
 
     env.close()
@@ -109,12 +120,12 @@ def main():
     # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
     # actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch2'
 
-    k=3
-    # actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer' + str(k)
-    actor_path = 'models/ddpg_actor_FlockingStochastic-v0_transfer_stoch' + str(k)
+    k = 3
+    actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer' + str(k)
+    fname = 'cfg/dagger.cfg'
 
-    fname = 'cfg/dagger_stoch.cfg'
-
+    # actor_path = 'models/ddpg_actor_FlockingStochastic-v0_transfer_stoch' + str(k)
+    # fname = 'cfg/dagger_stoch.cfg'
 
     config_file = path.join(path.dirname(__file__), fname)
     config = configparser.ConfigParser()
@@ -131,7 +142,6 @@ def main():
             test(config[section_name], actor_path, k)
     else:
         test(config[config.default_section], actor_path, k)
-
 
 
 if __name__ == "__main__":

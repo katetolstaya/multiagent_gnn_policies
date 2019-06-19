@@ -13,7 +13,7 @@ from learner.gnn_dagger import DAGGER
 
 def test(args, actor_path, k):
     # initialize gym env
-    env_name = args.get('env')
+    env_name = args.get('env') #'FlockingLeader-v0' #
     env = gym.make(env_name)
 
     debug = args.getboolean('debug')
@@ -69,9 +69,9 @@ def main():
     # fname = 'cfg/dagger_stoch.cfg'
 
 
-    base_actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer'
+    base_actor_path = 'models/ddpg_actor_FlockingStochastic-v0_transfer_stoch'
     k=3
-    fname = 'cfg/n.cfg'
+    fname = 'cfg/airsim_dagger.cfg'
 
     config_file = path.join(path.dirname(__file__), fname)
     config = configparser.ConfigParser()

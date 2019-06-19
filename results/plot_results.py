@@ -1,183 +1,150 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import csv
 import numpy as np
 from collections import OrderedDict
 
-colors={'Centralized':'green', 'Decentralized':'red', '4':'blue', '3':'darkviolet', '2':'orange', '1':'gold'}
-plt.rcParams["font.family"] = "Serif"
+font = {'family': 'serif',
+        'weight': 'bold',
+        'size': 14}
+matplotlib.rc('font', **font)
 
-def get_dict(fname, k_ind, v_ind):
-    list_costs = OrderedDict()
-    with open(fname, 'r') as csvfile:
-        plots = csv.reader(csvfile, delimiter=',')
-        next(plots, None)
-        for row in plots:
-            if len(row) == 4:
-                k = int(row[k_ind])
-                v = float(row[v_ind])
-                reward = float(row[3])
-                cost = -1.0 * reward
+_CENTRALIZED = 'Centr.'
+_DECENTRALIZED = 'Decentr.'
 
-                if k not in list_costs:
-                    list_costs[k] = OrderedDict()
+def main():
 
-                if v not in list_costs[k]:
-                    list_costs[k][v] = []
+    fig_fname = 'transfer_leader_vel'
 
-                list_costs[k][v].append(cost)
-    return list_costs
+    if fig_fname == 'vel':
+        fnames = ['vel.csv', 'vel_baseline.csv']
+        xlabel = 'Maximum Initial Velocity'
+        k_ind = 1
+        v_ind = 0
 
-def get_dict_baseline(fname, k_ind, v_ind):
-    list_costs = OrderedDict()
-    with open(fname, 'r') as csvfile:
-        plots = csv.reader(csvfile, delimiter=',')
-        next(plots, None)
-        for row in plots:
-            if len(row) == 4:
-                k = row[k_ind]
-                k = k.replace(" ", "")
-                if k == 'True':
-                    k = 'Centralized'
-                else:
-                    k = 'Decentralized'
+        arrow_params = {'x':3.3, 'y': 400.0, 'dx':0.0, 'dy':30.0, 'width':0.03, 'head_length':30, 'color':'r'}
+        text_params = {'x': 2.7, 'y': 370}
 
-                v = float(row[v_ind])
-                reward = float(row[3])
-                cost = -1.0 * reward
+    if fig_fname == 'transfer_vel':
+        fnames = ['transfer_vel.csv', 'vel_baseline.csv']
+        xlabel = 'Maximum Initial Velocity'
+        k_ind = 1
+        v_ind = 0
 
-                if k not in list_costs:
-                    list_costs[k] = OrderedDict()
+        arrow_params = None
 
-                if v not in list_costs[k]:
-                    list_costs[k][v] = []
+        # arrow_params = {'x':70, 'y': 400.0, 'dx':0.0, 'dy':30.0, 'width':1.5, 'head_length':30, 'color':'r'}
+        # text_params = {'x': 55, 'y': 370}
 
-                list_costs[k][v].append(cost)
-    return list_costs
+    if fig_fname == 'transfer_n':
+        fnames = ['transfer_n.csv', 'n_baseline.csv']
+        xlabel = 'Number of Agents'
+        k_ind = 0
+        v_ind = 1
 
-def get_mean(list_costs):
-    # compute average over diff seeds for each parameter combo
-    avg_costs = OrderedDict()
-    for k in list_costs.keys():
-        if k not in avg_costs:
-            avg_costs[k] = OrderedDict()
+        arrow_params = {'x':70, 'y': 400.0, 'dx':0.0, 'dy':30.0, 'width':1.5, 'head_length':30, 'color':'r'}
+        text_params = {'x': 55, 'y': 370}
 
-        for v in list_costs[k].keys():
-            avg_costs[k][v] = np.mean(list_costs[k][v])
-    return avg_costs
+    if fig_fname == 'transfer_leader_vel':
+        fnames = ['transfer_leader_vel.csv', 'vel_leader_baseline.csv']
+        xlabel = 'Maximum Initial Velocity'
+        k_ind = 1
+        v_ind = 0
+        arrow_params = None
 
-def get_stddev(list_costs):
-    # compute standard deviation
+    if fig_fname == 'rad':
+        fnames = ['rad.csv', 'rad_baseline.csv']
+        xlabel = 'Comm. Radius'
+        k_ind = 0
+        v_ind = 1
+
+        arrow_params = None
+
+
+    colors = {_CENTRALIZED: 'green', _DECENTRALIZED: 'red', '4': 'blue', '3': 'darkviolet', '2': 'orange', '1': 'gold'}
+    save_dir = 'fig/'
+
+    # fnames = ['rad.csv', 'rad_baseline.csv']
+    # xlabel = 'Comm. Radius'
+    # k_ind = 0
+    # v_ind = 1
+
+
+    mean_costs, std_costs = get_dict(fnames, k_ind, v_ind)
+
+    max_val, min_dec = get_max(mean_costs)
+    max_val = max_val + 10.0
+    ylabel = 'Cost'
+    title = ylabel + ' vs. ' + xlabel
+
+    # plot
+    fig, ax = plt.subplots()
+    for k in mean_costs.keys():
+        # if k != '4':
+        if not (k == _CENTRALIZED or k == _DECENTRALIZED):
+            label = 'K=' + k
+        else:
+            label = k
+        ax.errorbar(mean_costs[k].keys(), mean_costs[k].values(), yerr=std_costs[k].values(), marker='o', color=colors[k],
+                    label=label)
+
+    ax.legend()
+    plt.title(title)
+    plt.ylim(top=max_val, bottom=0)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+
+    if max_val < min_dec < np.Inf and arrow_params:
+        min_dec = int(np.floor(min_dec / 100.0)*100)
+        # plt.arrow(x=3.3, y=400.0, dx=0.0, dy=30.0, color='r', width=0.03, head_length=30)
+        plt.arrow(**arrow_params)
+        plt.text(x=text_params['x'], y=text_params['y'], s='Cost > '+str(min_dec), color='r')
+
+    plt.savefig(save_dir + fig_fname + '.eps', format='eps')
+    plt.show()
+
+
+def get_dict(fnames, k_ind, v_ind):
+    mean_costs = OrderedDict()
     std_costs = OrderedDict()
-    for k in list_costs.keys():
-        if k not in std_costs:
-            std_costs[k] = OrderedDict()
 
-        for v in list_costs[k].keys():
-            std_costs[k][v] = np.std(list_costs[k][v])
+    for fname in fnames:
+        with open(fname, 'r') as csvfile:
+            plots = csv.reader(csvfile, delimiter=',')
+            next(plots, None)
+            for row in plots:
+                if len(row) == 4:
+                    k = row[k_ind].strip()
 
-    return std_costs
+                    if k == 'True':
+                        k = _CENTRALIZED
+                    elif k == 'False':
+                        k = _DECENTRALIZED
+
+                    v = float(row[v_ind])
+                    mean = float(row[2]) * -1.0
+                    std = float(row[3])
+                    if k not in mean_costs:
+                        mean_costs[k] = OrderedDict()
+                        std_costs[k] = OrderedDict()
+                    mean_costs[k][v] = mean
+                    std_costs[k][v] = std
+
+    return mean_costs, std_costs
+
 
 def get_max(list_costs):
     # compute average over diff seeds for each parameter combo
     max_val = -1.0 * np.Inf
+    min_decentralized = 1.0 * np.Inf
 
     for k in list_costs.keys():
         for v in list_costs[k].keys():
-            for i in list_costs[k][v]:
-                max_val = np.maximum(max_val, i)
-    return max_val
+            if k != _DECENTRALIZED:
+                max_val = np.maximum(max_val, list_costs[k][v])
+            else:
+                min_decentralized = np.minimum(min_decentralized, list_costs[k][v])
+    return max_val, min_decentralized
 
-baseline=True
-fname_baseline = 'vel4_baseline.csv'
-k_ind_baseline = 2
-v_ind_baseline = 0
-
-fname = 'vel4.csv'
-xlabel = 'Maximum Initial Velocity'
-
-k_ind = 1
-v_ind = 0
-
-# baseline=True
-# fname_baseline = 'vel_leader_ baseline.csv'
-# k_ind_baseline = 2
-# v_ind_baseline = 0
-
-# fname = 'vel_leader.csv'
-# xlabel = 'Max Initial Velocity'
-# ylabel = 'Avg Cost'
-# k_ind = 1
-# v_ind = 0
-
-# fname_baseline = 'rad4_baseline.csv'
-# k_ind_baseline = 2
-# v_ind_baseline = 0
-#
-#
-# fname = 'rad4.csv'
-# xlabel = 'Comm. Radius'
-# k_ind = 0
-# v_ind = 2
-
-
-# fname = 'rad_leader.csv'
-# xlabel = 'Comm. Radius'
-# k_ind = 0
-# v_ind = 2
-#
-# fname_baseline = 'rad_leader_baseline.csv'
-# k_ind_baseline = 2
-# v_ind_baseline = 0
-
-
-# fname_baseline = 'n_baseline.csv'
-# k_ind_baseline = 1
-# v_ind_baseline = 2
-#
-#
-# fname = 'n.csv'
-# xlabel = 'Number of Agents'
-# k_ind = 0
-# v_ind = 2
-
-
-
-
-
-#
-list_costs = get_dict(fname, k_ind, v_ind)
-avg_costs = get_mean(list_costs)
-std_costs = get_stddev(list_costs)
-
-max_val = get_max(list_costs) + 10.0
-ylabel = 'Average Cost'
-title = ylabel + ' vs. ' + xlabel
-
-# plot
-fig, ax = plt.subplots()
-for k in avg_costs.keys():
-    ax.errorbar(avg_costs[k].keys(), avg_costs[k].values(), yerr=std_costs[k].values(), marker='o', color=colors[str(k)], label='K=' + str(k))
-
-
-if baseline:
-    list_costs_baseline = get_dict_baseline(fname_baseline, k_ind_baseline, v_ind_baseline)
-    avg_costs_baseline = get_mean(list_costs_baseline)
-    std_costs_baseline = get_stddev(list_costs_baseline)
-
-    for k in avg_costs_baseline.keys():
-        ax.errorbar(avg_costs_baseline[k].keys(), avg_costs_baseline[k].values(), yerr=std_costs_baseline[k].values(),
-                    marker='o', color=colors[str(k)], label=k)
-
-
-ax.legend()
-plt.title(title)
-plt.ylim(top=max_val, bottom=0)
-
-plt.xlabel(xlabel)
-plt.ylabel(ylabel)
-
-plt.savefig('vel.eps', format='eps')
-
-plt.show()
-
-
+if __name__ == "__main__":
+    main()
