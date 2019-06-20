@@ -62,9 +62,9 @@ def test(args, actor_path, k):
 def main():
 
     # fname = sys.argv[1]
-    base_actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer'
-    k = 2
-    fname = 'cfg/n_twoflocks.cfg'
+    # base_actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer'
+    # k = 2
+    # fname = 'cfg/n_twoflocks.cfg'
 
 
     # actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch2'
@@ -72,9 +72,9 @@ def main():
     # fname = 'cfg/dagger_stoch.cfg'
 
 
-    # base_actor_path = 'models/ddpg_actor_FlockingStochastic-v0_transfer_stoch'
-    # k=3
-    # fname = 'cfg/airsim_dagger.cfg'
+    base_actor_path = 'models/ddpg_actor_FlockingStochastic-v0_transfer_stoch'
+    k=3
+    fname = 'cfg/airsim_dagger.cfg'
 
     config_file = path.join(path.dirname(__file__), fname)
     config = configparser.ConfigParser()
