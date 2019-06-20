@@ -14,7 +14,21 @@ _DECENTRALIZED = 'Decentr.'
 
 def main():
 
-    fig_fname = 'transfer_n'
+    fig_fname = 'transfer_grid_n'
+
+    if fig_fname == 'transfer_grid_n':
+        fnames = ['transfer_grid_n.csv']
+        xlabel = 'Number of Agents'
+        k_ind = 0
+        v_ind = 1
+        arrow_params = None
+
+    if fig_fname == 'transfer_twoflocks_n':
+        fnames = ['transfer_twoflocks_n.csv']
+        xlabel = 'Number of Agents'
+        k_ind = 0
+        v_ind = 1
+        arrow_params = None
 
     if fig_fname == 'vel':
         fnames = ['vel.csv', 'vel_baseline.csv']
