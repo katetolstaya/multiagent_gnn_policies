@@ -14,7 +14,7 @@ _DECENTRALIZED = 'Decentr.'
 
 def main():
 
-    fig_fname = 'transfer_grid_n'
+    fig_fname = 'rad'
 
     if fig_fname == 'transfer_grid_n':
         fnames = ['transfer_grid_n.csv']
