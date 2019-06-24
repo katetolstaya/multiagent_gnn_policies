@@ -1,14 +1,16 @@
 import itertools
 
 baseline = False
-baseline = True
-param = 'vel'
-param = 'dt'
+# baseline = True
+# param = 'vel'
+# param = 'dt'
 # param = 'n'
 # param = 'rad'
 
-params = {}
+param = 'hidden_size'
 
+params = {}
+#
 # params['seed'] = range(10)
 
 if baseline:
@@ -19,8 +21,9 @@ if baseline:
 else:
     default_fname = 'default.cfg'
     out_fname = param + '.cfg'
+    params['n_layers'] = [1, 2, 3, 4]
 
-    params['k'] = [1, 2, 3, 4]
+    # params['k'] = [1, 2, 3, 4]
 
 if param == 'vel':
     params['v_max'] = [0.5, 1.5, 2.5, 3.5, 4.5]
@@ -30,6 +33,8 @@ elif param == 'n':
     params['n_agents'] = [25, 50, 75, 100, 125, 150, 175, 200]
 elif param == 'dt':
     params['dt'] = [0.1, 0.075, 0.05, 0.025, 0.01, 0.0075]
+elif param == 'hidden_size':
+    params['hidden_size'] = [4, 8, 16, 32, 64, 128]
 
 
 out_file = open(out_fname, "w")

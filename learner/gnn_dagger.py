@@ -28,6 +28,7 @@ class DAGGER(object):
         n_a = args.getint('n_actions')
         k = k or args.getint('k')
         hidden_size = args.getint('hidden_size')
+        n_layers = args.getint('n_layers') or 2
         gamma = args.getfloat('gamma')
         tau = args.getfloat('tau')
 
@@ -38,7 +39,7 @@ class DAGGER(object):
         # Device
         self.device = device
 
-        hidden_layers = [hidden_size, hidden_size]
+        hidden_layers = [hidden_size] * n_layers
         ind_agg = 0  # int(len(hidden_layers) / 2)  # aggregate halfway
 
         # Define Networks
