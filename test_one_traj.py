@@ -63,7 +63,7 @@ def test(args, actor_path, k):
         action = learner.select_action(state)
         next_state, reward, done, _ = env.step(action.cpu().numpy())
 
-        # next_state, reward, done, _ = env.step(env.env.controller(True))
+        # next_state, reward, done, _ = env.step(env.env.controller(False))
 
         stats = env.env.get_stats()
 
@@ -78,7 +78,7 @@ def test(args, actor_path, k):
         episode_reward += reward
         state = next_state
 
-        if step % 100 == 0:
+        if step % 300 == 0:
             env.render()
             plt.savefig(save_dir + 'traj' + str(step) + '.eps', format='eps')
 

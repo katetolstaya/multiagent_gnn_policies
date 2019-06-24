@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 font = {'family': 'serif',
         'weight': 'bold',
-        'size': 14}
+        'size': 12}
 matplotlib.rc('font', **font)
 
 _CENTRALIZED = 'Centr.'
@@ -15,35 +15,40 @@ _DECENTRALIZED = 'Decentr.'
 def main():
 
     # fig_fname = 'airsim_trained'
-    # fnames = ['airsim_trained.csv']
 
-    fig_fname = 'stoch_transfer_to_airsim'
-    fnames = ['stoch_transfer_to_airsim.csv']
+    fig_fname = 'airsim_test'
 
 
-    # colors = {_CENTRALIZED: 'green', _DECENTRALIZED: 'red', '4': 'blue', '3': 'darkviolet', '2': 'orange', '1': 'gold'}
     save_dir = 'fig/'
 
-    # fnames = ['rad.csv', 'rad_baseline.csv']
-    # xlabel = 'Comm. Radius'
     k_ind = 0
 
+    mean_cost_cent = [1.8930292856893]
+    std_cost_cent = [0.14931209808414267]
 
-    mean_costs, std_costs = get_dict(fnames, k_ind)
+    mean_cost_decent = [6.840906470373157]
+    std_cost_decent =  [1.6711923712693055]
 
-    # max_val, min_dec = get_max(mean_costs)
-    # max_val = max_val + 10.0
+    mean_costs_airsim, std_costs_airsim = get_dict(['airsim_trained.csv'], k_ind)
+    mean_costs_stoch, std_costs_stoch = get_dict(['stoch_transfer_to_airsim.csv'], k_ind)
     ylabel = 'Cost'
-    # title = ylabel + ' vs. ' + xlabel
 
     # plot
     fig, ax = plt.subplots()
 
-    ax.bar(mean_costs.keys(),  mean_costs.values(), yerr = std_costs.values())
+    ind = np.array(range(1,5))
+    width = 0.35/2  # the width of the bars
+    # p1 = ax.bar(ind, menMeans, width, bottom=0 * cm, yerr=menStd)
+    # p2 = ax.bar(ind + width, womenMeans, width, bottom=0 * cm, yerr=womenStd)
+
+    p1 = ax.bar(ind-width,  mean_costs_airsim.values(), width=width*2, yerr = std_costs_airsim.values())
+    p2 = ax.bar(ind+width,  mean_costs_stoch.values(), width=width*2, yerr = std_costs_stoch.values())
+    p3 = ax.bar(0, mean_cost_cent, width=width*3, yerr=std_cost_cent)
+    p4 = ax.bar(-1, mean_cost_decent, width=width*3,  yerr=std_cost_decent)
 
 
-    # ax.legend()
-    plt.title('Trained on Stochastic Point-Mass Model')
+    ax.legend((p1[0], p2[0], p3[0], p4[0]), ('Trained: AirSim', 'Trained: Point-Masses', 'Centralized', 'Decentralized'))
+    plt.title('Testing in AirSim')
     # plt.ylim(top=max_val, bottom=0)
     plt.xlabel('K')
     plt.ylabel(ylabel)
@@ -72,19 +77,6 @@ def get_dict(fnames, k_ind):
 
     return mean_costs, std_costs
 
-
-def get_max(list_costs):
-    # compute average over diff seeds for each parameter combo
-    max_val = -1.0 * np.Inf
-    min_decentralized = 1.0 * np.Inf
-
-    for k in list_costs.keys():
-        for v in list_costs[k].keys():
-            if k != _DECENTRALIZED:
-                max_val = np.maximum(max_val, list_costs[k][v])
-            else:
-                min_decentralized = np.minimum(min_decentralized, list_costs[k][v])
-    return max_val, min_decentralized
 
 if __name__ == "__main__":
     main()

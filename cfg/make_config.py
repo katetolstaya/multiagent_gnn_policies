@@ -21,9 +21,9 @@ if baseline:
 else:
     default_fname = 'default.cfg'
     out_fname = param + '.cfg'
-    params['n_layers'] = [1, 2, 3, 4]
+    # params['n_layers'] = [1, 2, 3, 4]
 
-    # params['k'] = [1, 2, 3, 4]
+    params['k'] = [1, 2, 3, 4]
 
 if param == 'vel':
     params['v_max'] = [0.5, 1.5, 2.5, 3.5, 4.5]

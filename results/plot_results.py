@@ -83,15 +83,8 @@ def main():
         arrow_params = {'x':85, 'y': 300.0, 'dx':0.0, 'dy':30.0, 'width':1.5, 'head_length':30, 'color':'r'}
         text_params = {'x': 70, 'y': 370}
 
-
     colors = {_CENTRALIZED: 'green', _DECENTRALIZED: 'red', '4': 'blue', '3': 'darkviolet', '2': 'orange', '1': 'gold'}
     save_dir = 'fig/'
-
-    # fnames = ['rad.csv', 'rad_baseline.csv']
-    # xlabel = 'Comm. Radius'
-    # k_ind = 0
-    # v_ind = 1
-
 
     mean_costs, std_costs = get_dict(fnames, k_ind, v_ind)
 
@@ -136,7 +129,8 @@ def get_dict(fnames, k_ind, v_ind):
             plots = csv.reader(csvfile, delimiter=',')
             next(plots, None)
             for row in plots:
-                if len(row) == 4:
+
+                if True: # len(row) == 4:
                     k = row[k_ind].strip()
 
                     if k == 'True':
@@ -145,8 +139,6 @@ def get_dict(fnames, k_ind, v_ind):
                         k = _DECENTRALIZED
 
                     v = float(row[v_ind])
-                    if v <30:
-                        continue
 
                     mean = float(row[2]) * -1.0
                     std = float(row[3])
