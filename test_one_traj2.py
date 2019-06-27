@@ -112,8 +112,10 @@ def test(args, actor_path, k):
     plt.plot(steps, y, 'b-', label='GNN')
     plt.fill_between(steps, y_min, y_max, color='lightblue')
 
-    plt.plot(steps, y2, 'r-', label='Decentralized')
+    plt.plot(steps, y2, 'r-', label='Local')
     plt.fill_between(steps, y_min2, y_max2, color='orange')
+
+    plt.axhline(y=1, linestyle='--', color='k', label='Comm. Radius')
     plt.legend()
 
     plt.xlabel('Step')
@@ -134,7 +136,7 @@ def test(args, actor_path, k):
     plt.plot(steps, y, 'b-', label='GNN')
     plt.fill_between(steps, y_min, y_max, color='lightblue')
 
-    plt.plot(steps, y2, 'r-', label='Decentralized')
+    plt.plot(steps, y2, 'r-', label='Local')
     plt.fill_between(steps, y_min2, y_max2, color='orange')
     plt.legend()
     plt.xlabel('Step')

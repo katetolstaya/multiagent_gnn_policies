@@ -29,8 +29,8 @@ def main():
     mean_cost_decent = [6.840906470373157]
     std_cost_decent =  [1.6711923712693055]
 
-    mean_costs_airsim, std_costs_airsim = get_dict(['airsim_trained.csv'], k_ind)
-    mean_costs_stoch, std_costs_stoch = get_dict(['stoch_transfer_to_airsim.csv'], k_ind)
+    mean_costs_airsim, std_costs_airsim = get_dict(['airsim_trained2.csv'], k_ind)
+    mean_costs_stoch, std_costs_stoch = get_dict(['stoch_transfer_to_airsim2.csv'], k_ind)
     ylabel = 'Cost'
 
     # plot
@@ -47,7 +47,7 @@ def main():
     p4 = ax.bar(-1, mean_cost_decent, width=width*3,  yerr=std_cost_decent)
 
 
-    ax.legend((p1[0], p2[0], p3[0], p4[0]), ('Trained: AirSim', 'Trained: Point-Masses', 'Centralized', 'Decentralized'))
+    ax.legend((p1[0], p2[0], p3[0], p4[0]), ('Trained: AirSim', 'Trained: Point-Masses', 'Global', 'Local'))
     plt.title('Testing in AirSim')
     # plt.ylim(top=max_val, bottom=0)
     plt.xlabel('K')

@@ -10,11 +10,11 @@ font = {'family': 'serif',
 matplotlib.rc('font', **font)
 
 _CENTRALIZED = 'Global'
-_DECENTRALIZED = 'Local.'
+_DECENTRALIZED = 'Local'
 
 def main():
 
-    fig_fname = 'rad'
+    fig_fname = 'n'
 
     if fig_fname == 'transfer_grid_n':
         fnames = ['transfer_grid_n.csv']

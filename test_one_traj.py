@@ -47,7 +47,7 @@ def test(args, actor_path, k):
 
     learner.load_model(actor_path, device)
 
-    n_steps = 500
+    n_steps = 400
 
     steps = np.zeros((n_steps,))
     min_dists_mean = np.zeros((n_steps,))
@@ -80,35 +80,37 @@ def test(args, actor_path, k):
 
         if step % 300 == 0:
             env.render()
-            plt.savefig(save_dir + 'traj' + str(step) + '.eps', format='eps')
+            plt.savefig(save_dir + 'leader_traj' + str(step) + '.eps', format='eps')
+
+    plt.show()
 
     plt.ioff()
-
-    y = min_dists_mean
-    y_min = min_dists_mean - min_dists_std
-    y_max = min_dists_mean + min_dists_std
-
-    fig = plt.figure()
-    plt.plot(steps, y, 'b-')
-    plt.fill_between(steps, y_min, y_max, color='lightblue')
-    plt.xlabel('Step')
-    plt.ylabel('Min. Distances')
-    plt.tight_layout()
-    plt.savefig(save_dir + 'min_dist.eps', format='eps')
-    plt.show()
-
-    y = vel_diffs_mean
-    y_min = vel_diffs_mean - vel_diffs_std
-    y_max = vel_diffs_mean + vel_diffs_std
-
-    fig = plt.figure()
-    plt.plot(steps, y, 'r-')
-    plt.fill_between(steps, y_min, y_max, color='orange')
-    plt.xlabel('Step')
-    plt.ylabel('Velocity Diff.')
-    plt.tight_layout()
-    plt.savefig(save_dir + 'vel_diff.eps', format='eps')
-    plt.show()
+    #
+    # y = min_dists_mean
+    # y_min = min_dists_mean - min_dists_std
+    # y_max = min_dists_mean + min_dists_std
+    #
+    # fig = plt.figure()
+    # plt.plot(steps, y, 'b-')
+    # plt.fill_between(steps, y_min, y_max, color='lightblue')
+    # plt.xlabel('Step')
+    # plt.ylabel('Min. Distances')
+    # plt.tight_layout()
+    # plt.savefig(save_dir + 'min_dist.eps', format='eps')
+    # plt.show()
+    #
+    # y = vel_diffs_mean
+    # y_min = vel_diffs_mean - vel_diffs_std
+    # y_max = vel_diffs_mean + vel_diffs_std
+    #
+    # fig = plt.figure()
+    # plt.plot(steps, y, 'r-')
+    # plt.fill_between(steps, y_min, y_max, color='orange')
+    # plt.xlabel('Step')
+    # plt.ylabel('Velocity Diff.')
+    # plt.tight_layout()
+    # plt.savefig(save_dir + 'vel_diff.eps', format='eps')
+    # plt.show()
 
     env.close()
 
@@ -120,12 +122,20 @@ def main():
     # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
     # actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch2'
 
-    k = 3
-    actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer' + str(k)
-    fname = 'cfg/dagger.cfg'
+    # k = 3
+    # actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer' + str(k)
+    # fname = 'cfg/dagger.cfg'
 
     # actor_path = 'models/ddpg_actor_FlockingStochastic-v0_transfer_stoch' + str(k)
     # fname = 'cfg/dagger_stoch.cfg'
+
+
+    k = 3
+    actor_path = 'models/ddpg_actor_FlockingRelative-v0_transfer' + str(k)
+    fname = 'cfg/dagger_leader.cfg'
+
+
+
 
     config_file = path.join(path.dirname(__file__), fname)
     config = configparser.ConfigParser()
