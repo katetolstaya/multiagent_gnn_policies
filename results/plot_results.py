@@ -9,8 +9,8 @@ font = {'family': 'serif',
         'size': 14}
 matplotlib.rc('font', **font)
 
-_CENTRALIZED = 'Centr.'
-_DECENTRALIZED = 'Decentr.'
+_CENTRALIZED = 'Global'
+_DECENTRALIZED = 'Local.'
 
 def main():
 
