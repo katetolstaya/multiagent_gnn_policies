@@ -23,11 +23,12 @@ def main():
 
     k_ind = 0
 
-    mean_cost_cent = [1.8930292856893]
-    std_cost_cent = [0.14931209808414267]
+    mean_cost_cent = [2.041724997601464]
+    std_cost_cent = [0.07619242768446846]
 
-    mean_cost_decent = [6.840906470373157]
-    std_cost_decent =  [1.6711923712693055]
+    mean_cost_decent = [9.335155311869324]
+    std_cost_decent = [2.6593089180772074]
+
 
     mean_costs_airsim, std_costs_airsim = get_dict(['airsim_trained2.csv'], k_ind)
     mean_costs_stoch, std_costs_stoch = get_dict(['stoch_transfer_to_airsim2.csv'], k_ind)
@@ -52,6 +53,8 @@ def main():
     # plt.ylim(top=max_val, bottom=0)
     plt.xlabel('K')
     plt.ylabel(ylabel)
+
+    ax.set_xticklabels(('', '', '', '1', '2', '3', '4'))
 
     plt.savefig(save_dir + fig_fname + '.eps', format='eps')
     plt.show()
