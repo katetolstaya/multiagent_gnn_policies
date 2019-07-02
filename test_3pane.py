@@ -106,7 +106,7 @@ def main():
         # a.set_yticklabels(a.get_yticks(), font)
         plt.title('GNN K = 1')
         cost_text_nn = plt.text(-5.0, 8.5, '', fontsize=18)
-        quiver1 = ax.quiver([], [], [], [], color='k')
+        quiver1 = ax.quiver([], [], [], [], color='k', scale=1.0)
 
 
         ################
@@ -120,7 +120,7 @@ def main():
         # a.set_xticklabels(a.get_xticks(), font)
         # a.set_yticklabels(a.get_yticks(), font)
         cost_text_d = plt.text(-5.0, 8.5, '', fontsize=18)
-        quiver2 = ax.quiver([], [], [], [], color='k')
+        quiver2 = ax.quiver([], [], [], [], color='k', scale=1.0)
 
         ##################
         ax = fig.add_subplot(131)
@@ -133,13 +133,13 @@ def main():
         # a.set_xticklabels(a.get_xticks(), font)
         # a.set_yticklabels(a.get_yticks(), font)
         cost_text_c = plt.text(-5.0, 8.5, '', fontsize=18)
-        quiver3 = ax.quiver([], [], [], [], color='k')
+        quiver3 = ax.quiver([], [], [], [], color='k', scale=1.0)
 
         mng = plt.get_current_fig_manager()
         mng.resize(*mng.window.maxsize())
 
 
-    for ep_num in [ 0,2,5,6,7,8,9]: #
+    for ep_num in [ 0,2,5,6,7,8,9, 10, 11]: #
         episode_reward1 = 0
         episode_reward2 = 0
         episode_reward3 = 0
@@ -200,7 +200,7 @@ def main():
                 line3.set_ydata(state3[:, 1])
 
 
-                s = 20.0
+                s = 0.05
                 quiver1.set_offsets(state1[0:n_leaders, 0:2])
                 quiver1.set_UVC(state1[0:n_leaders, 2] * s, state1[0:n_leaders, 3] * s)
 
