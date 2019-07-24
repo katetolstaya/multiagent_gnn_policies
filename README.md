@@ -8,14 +8,11 @@
 ## Available algorithms:
 - Behavior Cloning as described in [ArXiv](https://arxiv.org/abs/1903.10527) `python3 train.py cfg/cloning.cfg`
 - DAGGER imitation learning `python3 train.py cfg/dagger.cfg`
-- Deep Deterministic Policy Gradients (TODO)
+
+## To test:
+- `python3 test_model.py cfg/dagger.cfg`
 
 ## Other code:
 - `python3 flocking_gym_test.py` provides test code for the Gym Flock environments
 
-## To Do
-- Plot centralized and decentralized baselines
-- Obstacle avoidance
-- Follow 1 or 2 leaders
-- Play with control costs
-- DDPG
+

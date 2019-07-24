@@ -11,12 +11,10 @@ from learner.state_with_delay import MultiAgentStateWithDelay
 from learner.gnn_dagger import DAGGER
 
 
-def test(args):
+def test(args, actor_path, render=True):
     # initialize gym env
     env_name = args.get('env')
-    env_name = "FlockingAirsimAccel-v0"
     env = gym.make(env_name)
-
     if isinstance(env.env, gym_flock.envs.FlockingRelativeEnv):
         env.env.params_from_cfg(args)
 
@@ -31,10 +29,6 @@ def test(args):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     learner = DAGGER(device, args)
     n_test_episodes = args.getint('n_test_episodes')
-    # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
-    # actor_path = 'models/ddpg_actor_FlockingRelative-v0_k3'
-    actor_path = 'models/ddpg_actor_FlockingStochastic-v0_stoch2'
-
     learner.load_model(actor_path, device)
 
     for _ in range(n_test_episodes):
@@ -47,7 +41,8 @@ def test(args):
             next_state = MultiAgentStateWithDelay(device, args, next_state, prev_state=state)
             episode_reward += reward
             state = next_state
-            #env.render()
+            if render:
+                env.render()
         print(episode_reward)
     env.close()
 
@@ -59,6 +54,7 @@ def main():
     config.read(config_file)
 
     printed_header = False
+    actor_path = 'models/actor_FlockingRelative-v0_dagger_k3'
 
     if config.sections():
         for section_name in config.sections():
@@ -66,9 +62,9 @@ def main():
                 print(config[section_name].get('header'))
                 printed_header = True
 
-            test(config[section_name])
+            test(config[section_name], actor_path)
     else:
-        test(config[config.default_section])
+        test(config[config.default_section], actor_path)
 
 
 
