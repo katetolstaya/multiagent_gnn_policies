@@ -28,7 +28,7 @@ class ReplayBuffer(object):
             self.buffer.append(None)
             self.curr_size = self.curr_size + 1
 
-        self.buffer[self.position] = Transition(*sample)
+        self.buffer[self.position] = sample  # Transition(*sample)
         self.position = (self.position + 1) % self.max_size
 
     def sample(self, num_samples):
