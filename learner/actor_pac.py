@@ -21,14 +21,17 @@ class Actor(nn.Module):
         self.msg_len = msg_len
         self.n_s = n_s
         self.n_a = n_a
-        self.layers = [n_s + msg_len] + hidden_layers + [n_a + msg_len]
+        self.msg_len = msg_len
+        self.layers = [n_s + msg_len + msg_len] + hidden_layers + [n_a + msg_len]
+        # self.layers = [n_s] + hidden_layers + [n_a + msg_len]
+        # self.layers = [n_s + msg_len] + hidden_layers + [n_a + msg_len]
         self.n_layers = len(self.layers) - 1
 
         self.conv_layers = []
 
         for i in range(0, self.n_layers):
-            m = nn.Conv1d(in_channels=self.layers[i], out_channels=self.layers[i + 1], kernel_size=1,
-                          stride=1)
+            m = nn.Conv2d(in_channels=self.layers[i], out_channels=self.layers[i + 1], kernel_size=(1,1),
+                          stride=(1,1))
 
             self.conv_layers.append(m)
 
@@ -52,28 +55,36 @@ class Actor(nn.Module):
 
         assert value.shape[2] == self.n_s
 
-        output_actions = []
-        output_messages = []
+        # output_actions = []
+        # output_messages = []
+
+        # if unroll_len > 1:
+        #     current_message = torch.zeros_like(message[:, 0, :, :])
+        # else:
+        #     current_message = message[:, 0, :, :]
 
         current_message = message[:, 0, :, :]
+        # current_message = torch.zeros_like(message[:, 0, :, :])
+        current_message = current_message.view((batch_size, 1, self.msg_len, n_agents))
 
         for l in range(unroll_len):
-            passed_messages = torch.matmul(current_message, network[:, l, :, :])  # B, F, N
-            current_values = value[:, l, :, :]  # B, F, N
-            x = torch.cat((passed_messages, current_values), 1)  # cat in features dim
-
+            current_network = network[:, l, :, :].view((batch_size, 1, n_agents, n_agents))
+            passed_messages = torch.matmul(current_message, current_network)  # B, F, N
+            current_values = value[:, l, :, :].view((batch_size, 1, self.n_s, n_agents))  # B, F, N
+            x = torch.cat((passed_messages, current_message, current_values), 2)  # cat in features dim
+            # x = current_values  # cat in features dim
+            # x = torch.cat((passed_messages, current_values), 2)  # cat in features dim
+            x = x.permute(0, 2, 1, 3)  # now (B,F,K,N)
             for i in range(self.n_layers):
+                # print(x.size())
                 x = self.conv_layers[i](x)
+                x = torch.tanh(x)
 
-                if i < self.n_layers - 1:
-                    x = torch.tanh(x)
-                else:
-                    x = 10.0 * torch.tanh(x)
+            x = x.permute(0, 2, 1, 3)  # now (B,K,F,N)
+            actions = x[:, 0, 0:self.n_a, :].view((batch_size, 1, self.n_a, n_agents))
+            current_message = x[:, 0, self.n_a:self.n_a + self.msg_len, :].view((batch_size, 1, self.msg_len, n_agents))
 
-            actions = x[:, 0:self.n_a, :]
-            current_message = x[:, self.n_a:self.n_a + self.msg_len, :]
-
-            output_messages.append(current_message.view((batch_size, 1, self.msg_len, n_agents)))
-            output_actions.append(actions.view((batch_size, 1, self.n_a, n_agents)))
-
-        return torch.cat(tuple(output_actions), 1), torch.cat(tuple(output_messages), 1)
+            # output_messages.append(current_message)
+            # output_actions.append(actions)
+        # return torch.cat(tuple(output_actions), 1), torch.cat(tuple(output_messages), 1)
+        return actions, current_message

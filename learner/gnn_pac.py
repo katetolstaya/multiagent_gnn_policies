@@ -30,6 +30,8 @@ class DAggerPAC(object):
         gamma = args.getfloat('gamma')
         tau = args.getfloat('tau')
 
+        self.grad_clipping = args.getfloat('grad_clipping')
+
         self.n_agents = args.getint('n_agents')
         self.n_states = n_s
         self.n_actions = n_a
@@ -39,7 +41,7 @@ class DAggerPAC(object):
         self.device = device
 
         hidden_layers = [hidden_size] * n_layers
-        ind_agg = 0  # int(len(hidden_layers) / 2)  # aggregate halfway
+        # ind_agg = 0  # int(len(hidden_layers) / 2)  # aggregate halfway
 
         # Define Networks
         self.actor = Actor(n_s, n_a, msg_len, hidden_layers).to(self.device)
@@ -58,7 +60,6 @@ class DAggerPAC(object):
         :return:
         """
         self.actor.eval()  # Switch the actor network to Evaluation Mode.
-
         action, message = self.actor(state.value, state.network, state.message)  # .to(self.device)
 
         # mu is (B, 1, nA, N), need (N, nA)
@@ -92,6 +93,7 @@ class DAggerPAC(object):
             network_batch.append(torch.cat(tuple([t.state.network for t in transitions]), 1))
             message_batch.append(torch.cat(tuple([t.state.message for t in transitions]), 1))
             optimal_action_batch.append(torch.cat(tuple([t.action for t in transitions]), 1))
+            # optimal_action_batch.append(transitions[-1].action)
 
         value_batch = Variable(torch.cat(tuple(value_batch))).to(self.device)
         network_batch = Variable(torch.cat(tuple(network_batch))).to(self.device)
@@ -99,11 +101,11 @@ class DAggerPAC(object):
         optimal_action_batch = Variable(torch.cat(tuple(optimal_action_batch))).to(self.device)
         actor_batch, _ = self.actor(value_batch, network_batch, message_batch)
 
-        # Optimize Actor
         self.actor_optim.zero_grad()
         # Loss related to sampled Actor Gradient.
-        policy_loss = F.mse_loss(actor_batch, optimal_action_batch)
+        policy_loss = F.mse_loss(actor_batch[:, -1, :, :], optimal_action_batch[:, -1, :, :])
         policy_loss.backward()
+        torch.nn.utils.clip_grad_value_(self.actor.parameters(), self.grad_clipping)
         self.actor_optim.step()
         # End Optimize Actor
 
@@ -149,7 +151,9 @@ def train_dagger(env, args, device):
     unroll_length = args.getint('unroll_len')
 
     n_train_episodes = args.getint('n_train_episodes')
+
     beta_coeff = args.getfloat('beta_coeff')
+    beta_min = args.getfloat('beta_min')
     test_interval = args.getint('test_interval')
     n_test_episodes = args.getint('n_test_episodes')
 
@@ -160,9 +164,7 @@ def train_dagger(env, args, device):
     stats = {'mean': -1.0 * np.Inf, 'std': 0}
 
     for i in range(n_train_episodes):
-        # print(i)
-
-        beta = max(beta * beta_coeff, 0.5)
+        beta = max(beta * beta_coeff, beta_min)
 
         message = np.zeros((n_agents, msg_len))
 

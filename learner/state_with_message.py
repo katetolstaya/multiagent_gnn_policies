@@ -29,6 +29,8 @@ class MultiAgentState(object):
 
         # reshape values and network to correct shape
         state_value = state_value.transpose(1, 0)
+        messages = messages.transpose(1, 0)
+
         state_value = state_value.reshape((1, 1, n_states, n_agents))
         state_network = state_network.reshape((1, 1, n_agents, n_agents))
         state_message = messages.reshape((1, 1, msg_len, n_agents))
