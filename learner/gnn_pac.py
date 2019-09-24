@@ -221,7 +221,8 @@ def train_dagger(env, args, device):
 
         if i % test_interval == 0 and debug:
             test_rewards = []
-            for _ in range(n_test_episodes):
+            for j in range(n_test_episodes):
+                print(j)
                 ep_reward = 0
                 message = np.zeros((n_agents, msg_len))
                 state = MultiAgentState(device, args, env.reset(), message)
