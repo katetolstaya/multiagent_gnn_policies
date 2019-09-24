@@ -211,7 +211,8 @@ def train_dagger(env, args, device):
         print("one trajectory")
 
         if memory.curr_size > batch_size:
-            for _ in range(args.getint('updates_per_step')):
+            for j in range(args.getint('updates_per_step')):
+                print(j)
                 unrolled_transitions = memory.sample(batch_size)
                 # batch = Transition(*zip(*transitions))
                 policy_loss = learner.gradient_step(unrolled_transitions)
