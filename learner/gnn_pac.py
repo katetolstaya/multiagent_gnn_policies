@@ -226,9 +226,12 @@ def train_dagger(env, args, device):
                 ep_reward = 0
                 message = np.zeros((n_agents, msg_len))
                 state = MultiAgentState(device, args, env.reset(), message)
+                print('reset')
                 done = False
                 while not done:
+                    print('first learner step')
                     action, message = learner.step(state)
+                    print('first env step')
                     next_state, reward, done, _ = env.step(action.cpu().numpy())
                     next_state = MultiAgentState(device, args, next_state, message)
                     ep_reward += reward
