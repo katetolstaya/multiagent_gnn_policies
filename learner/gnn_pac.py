@@ -208,6 +208,7 @@ def train_dagger(env, args, device):
                 unroll = []
 
             state = next_state
+        print("one trajectory")
 
         if memory.curr_size > batch_size:
             for _ in range(args.getint('updates_per_step')):
