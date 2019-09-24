@@ -219,44 +219,44 @@ def train_dagger(env, args, device):
                 policy_loss_sum += policy_loss
                 updates += 1
 
-        if i % test_interval == 0 and debug:
-            test_rewards = []
-            for j in range(n_test_episodes):
-                print(j)
-                ep_reward = 0
-                message = np.zeros((n_agents, msg_len))
-                state = MultiAgentState(device, args, env.reset(), message)
-                print('reset')
-                done = False
-                while not done:
-                    print('first learner step')
-                    action, message = learner.step(state)
-                    print('first env step')
-                    next_state, reward, done, _ = env.step(action.cpu().numpy())
-                    print(reward)
-                    print('make state')
-                    next_state = MultiAgentState(device, args, next_state, message)
-                    ep_reward += reward
-                    state = next_state
-                    print('made state')
-                    # env.render()
-                test_rewards.append(ep_reward)
-
-            mean_reward = np.mean(test_rewards)
-            # if stats['mean'] < mean_reward:
-            #     stats['mean'] = mean_reward
-            #     stats['std'] = np.std(test_rewards)
-            #
-            #     if debug and args.get('fname'):  # save the best model
-            #         learner.save_model(args.get('env'), suffix=args.get('fname'))
-
-            if debug:
-                print(
-                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}".format(
-                        i, updates,
-                        total_numsteps,
-                        mean_reward,
-                        policy_loss_sum))
+        # if i % test_interval == 0 and debug:
+        #     test_rewards = []
+        #     for j in range(n_test_episodes):
+        #         print(j)
+        #         ep_reward = 0
+        #         message = np.zeros((n_agents, msg_len))
+        #         state = MultiAgentState(device, args, env.reset(), message)
+        #         print('reset')
+        #         done = False
+        #         while not done:
+        #             print('first learner step')
+        #             action, message = learner.step(state)
+        #             print('first env step')
+        #             next_state, reward, done, _ = env.step(action.cpu().numpy())
+        #             print(reward)
+        #             print('make state')
+        #             next_state = MultiAgentState(device, args, next_state, message)
+        #             ep_reward += reward
+        #             state = next_state
+        #             print('made state')
+        #             # env.render()
+        #         test_rewards.append(ep_reward)
+        #
+        #     mean_reward = np.mean(test_rewards)
+        #     # if stats['mean'] < mean_reward:
+        #     #     stats['mean'] = mean_reward
+        #     #     stats['std'] = np.std(test_rewards)
+        #     #
+        #     #     if debug and args.get('fname'):  # save the best model
+        #     #         learner.save_model(args.get('env'), suffix=args.get('fname'))
+        #
+        #     if debug:
+        #         print(
+        #             "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}".format(
+        #                 i, updates,
+        #                 total_numsteps,
+        #                 mean_reward,
+        #                 policy_loss_sum))
 
     # test_rewards = []
     # for _ in range(n_test_episodes):
