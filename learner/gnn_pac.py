@@ -232,6 +232,7 @@ def train_dagger(env, args, device):
                     print('first learner step')
                     action, message = learner.step(state)
                     action = action.cpu().numpy()
+                    message = message.cpu().numpy()
                     print('first env step')
                     next_state, reward, done, _ = env.step(action)
                     print(reward)
