@@ -233,10 +233,12 @@ def train_dagger(env, args, device):
                     action, message = learner.step(state)
                     print('first env step')
                     next_state, reward, done, _ = env.step(action.cpu().numpy())
+                    print(reward)
+                    print('make state')
                     next_state = MultiAgentState(device, args, next_state, message)
                     ep_reward += reward
                     state = next_state
-                    print(reward)
+                    print('made state')
                     # env.render()
                 test_rewards.append(ep_reward)
 
