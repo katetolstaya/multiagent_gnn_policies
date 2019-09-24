@@ -198,49 +198,35 @@ def train_dagger(env, args, device):
             optimal_action = optimal_action.reshape((1, 1, n_a, n_agents))
 
             transition = Transition(state, optimal_action, notdone, next_state, reward)
-
-            # memory.insert()
-
             unroll.append(transition)
 
             if len(unroll) == unroll_length:
                 memory.insert(unroll)
                 unroll = []
-
             state = next_state
-        print("one trajectory")
 
         if memory.curr_size > batch_size:
-            for j in range(args.getint('updates_per_step')):
-                print(j)
+            for _ in range(args.getint('updates_per_step')):
                 unrolled_transitions = memory.sample(batch_size)
-                # batch = Transition(*zip(*transitions))
                 policy_loss = learner.gradient_step(unrolled_transitions)
                 policy_loss_sum += policy_loss
                 updates += 1
 
         if i % test_interval == 0 and debug:
             test_rewards = []
-            for j in range(n_test_episodes):
-                print(j)
+            for _ in range(n_test_episodes):
                 ep_reward = 0
                 message = np.zeros((n_agents, msg_len))
                 state = MultiAgentState(device, args, env.reset(), message)
-                print('reset')
                 done = False
                 while not done:
-                    print('first learner step')
                     action, message = learner.step(state)
                     action = action.cpu().numpy()
                     message = message.cpu().numpy()
-                    print('first env step')
                     next_state, reward, done, _ = env.step(action)
-                    print(reward)
-                    print('make state')
                     next_state = MultiAgentState(device, args, next_state, message)
                     ep_reward += reward
                     state = next_state
-                    print('made state')
                     # env.render()
                 test_rewards.append(ep_reward)
 
@@ -260,27 +246,29 @@ def train_dagger(env, args, device):
                         mean_reward,
                         policy_loss_sum))
 
-    # test_rewards = []
-    # for _ in range(n_test_episodes):
-    #     ep_reward = 0
-    #     message = np.zeros((n_agents, msg_len))
-    #     state = MultiAgentState(device, args, env.reset(), message)
-    #     done = False
-    #     while not done:
-    #         action, message = learner.step(state)
-    #         next_state, reward, done, _ = env.step(action.cpu().numpy())
-    #         next_state = MultiAgentState(device, args, next_state, message)
-    #         ep_reward += reward
-    #         state = next_state
-    #         # env.render()
-    #     test_rewards.append(ep_reward)
-    #
-    # mean_reward = np.mean(test_rewards)
-    # stats['mean'] = mean_reward
-    # stats['std'] = np.std(test_rewards)
-    #
-    # if debug and args.get('fname'):  # save the best model
-    #     learner.save_model(args.get('env'), suffix=args.get('fname'))
+    test_rewards = []
+    for _ in range(n_test_episodes):
+        ep_reward = 0
+        message = np.zeros((n_agents, msg_len))
+        state = MultiAgentState(device, args, env.reset(), message)
+        done = False
+        while not done:
+            action, message = learner.step(state)
+            action = action.cpu().numpy()
+            message = message.cpu().numpy()
+            next_state, reward, done, _ = env.step(action)
+            next_state = MultiAgentState(device, args, next_state, message)
+            ep_reward += reward
+            state = next_state
+            # env.render()
+        test_rewards.append(ep_reward)
+
+    mean_reward = np.mean(test_rewards)
+    stats['mean'] = mean_reward
+    stats['std'] = np.std(test_rewards)
+
+    if debug and args.get('fname'):  # save the best model
+        learner.save_model(args.get('env'), suffix=args.get('fname'))
 
     env.close()
     return stats
