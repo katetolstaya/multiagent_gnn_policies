@@ -31,13 +31,18 @@ class MultiAgentState(object):
         state_value = state_value.transpose(1, 0)
         messages = messages.transpose(1, 0)
 
+        print('made state1')
+
         state_value = state_value.reshape((1, 1, n_states, n_agents))
         state_network = state_network.reshape((1, 1, n_agents, n_agents))
         state_message = messages.reshape((1, 1, msg_len, n_agents))
+
+        print('to gpu')
 
         # move matrices to GPU
         self.value = torch.Tensor(state_value).to(device)
         self.network = torch.Tensor(state_network).to(device)
         self.message = torch.Tensor(state_message).to(device)
+        print('made state10')
 
 
