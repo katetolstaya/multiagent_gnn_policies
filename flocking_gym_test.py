@@ -3,7 +3,7 @@ import gym_flock
 import configparser
 
 
-env_name = "Mapping-v0"
+env_name = "MappingLocal-v0"
 # config_file = 'cfg/n_twoflocks.cfg'
 
 # env_name = "FlockingRelative-v0"
@@ -22,17 +22,18 @@ env = gym.make(env_name)
 
 while True:
     state = env.reset()
-    episode_reward = 0
+    # episode_reward = 0
     done = False
     while not done:
         action = env.env.controller()
         # action = env.env.controller(False)
 
         next_state, reward, done, _ = env.step(action)
-        episode_reward += reward
+        print(reward)
+        # episode_reward += reward
         state = next_state
         env.render()
 
-    print(episode_reward)
+    # print(episode_reward)
 
 env.close()

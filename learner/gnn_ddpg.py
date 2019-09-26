@@ -14,6 +14,7 @@ from learner.replay_buffer import ReplayBuffer
 from learner.replay_buffer import Transition
 from learner.actor import Actor
 from learner.critic import Critic
+from learner.ounoise import OUNoise
 
 ''' Parse Arguments'''
 parser = argparse.ArgumentParser(description='DDPG Implementation')
@@ -31,49 +32,6 @@ parser.add_argument('--buffer_size', type=int, default=10000, help='Replay Buffe
 parser.add_argument('--updates_per_step', type=int, default=1, help='Updates per Batch')
 
 args = parser.parse_args()
-
-
-class OUNoise:
-    """
-    Generates noise from an Ornstein Uhlenbeck process, for temporally correlated exploration. Useful for physical
-    control problems with inertia. See https://en.wikipedia.org/wiki/Ornstein%E2%80%93Uhlenbeck_process
-    """
-
-    def __init__(self, n_a, n_agents, scale=0.05, mu=0, theta=0.15, sigma=0.2):  # TODO change default params
-        """
-        Initialize the Noise parameters.
-        :param n_a: Size of the Action space.
-        :param n_agents: Number of agents.
-        :param scale: Scale of the noise process.
-        :param mu: The mean of the noise.
-        :param theta: Inertial term for drift..
-        :param sigma: Standard deviation of noise.
-        """
-        self.nA = n_a
-        self.n_agents = n_agents
-        self.scale = scale
-        self.mu = mu
-        self.theta = theta
-        self.sigma = sigma
-        self.state = np.ones((self.n_agents, self.nA)) * self.mu
-        self.reset()
-
-    def reset(self):
-        """
-        Reset the noise process.
-        :return:
-        """
-        self.state = np.ones((self.n_agents, self.nA)) * self.mu
-
-    def noise(self):
-        """
-        Compute the next noise value.
-        :return: The noise value.
-        """
-        x = self.state
-        dx = self.theta * (self.mu - x) + self.sigma * np.random.standard_normal(np.shape(x))
-        self.state = x + dx
-        return self.state * self.scale
 
 
 class DDPG(object):
@@ -253,55 +211,6 @@ class DDPG(object):
             self.actor.load_state_dict(torch.load(actor_path).to(self.device))
         if critic_path is not None:
             self.critic.load_state_dict(torch.load(critic_path).to(self.device))
-
-
-class MultiAgentStateWithDelay(object):
-
-    def __init__(self, device, args, env_state, prev_state=None):
-        """
-        Create the state object that keeps track of the current state and GSO and history information
-        :param device: CUDA device to use with PyTorch
-        :param args:
-        :param env_state:
-        :param prev_state:
-        """
-        n_states = args.n_states
-        n_agents = args.n_agents
-        k = args.k
-
-        # split up the state tuple
-        state_value, state_network = env_state
-
-        assert state_value.shape == (n_agents, n_states)
-        assert state_network.shape == (n_agents, n_agents)
-        assert np.sum(np.diag(state_network)) == 0  # assume no self loops
-
-        # reshape values and network to correct shape
-        state_value = state_value.transpose(1, 0)
-        state_value = state_value.reshape((1, 1, n_states, n_agents))
-        state_network = state_network.reshape((1, 1, n_agents, n_agents))
-
-        # move matrices to GPU
-        self.values = torch.Tensor(state_value).to(device)
-        self.network = torch.Tensor(state_network).to(device)
-
-        # compute current GSO - powers of the network matrix: current GSO: I, A_t, A_t^2... A_t^k-1
-        self.curr_gso = torch.zeros((1, k, n_agents, n_agents)).to(device)
-        self.curr_gso[0, 0, :, :] = torch.eye(n_agents).view((1, 1, n_agents, n_agents)).to(device)  # I
-        for k_ind in range(1, k):
-            self.curr_gso[0, k_ind, :, :] = torch.matmul(self.network, self.curr_gso[0, k_ind - 1, :, :])
-
-        # delayed GSO: I, A_t-1, ...,  A_t-1 * ... * A_t-k
-        self.delay_gso = torch.zeros((1, k, n_agents, n_agents)).to(device)
-        self.delay_gso[0, 0, :, :] = torch.eye(n_agents).view((1, 1, n_agents, n_agents)).to(device)  # I
-        if prev_state is not None and k > 1:
-            self.delay_gso[0, 1:k, :, :] = torch.matmul(self.network, prev_state.delay_gso[0, 0:k - 1, :, :])
-
-        # delayed x values x_t, x_t-1,..., x_t-k
-        self.delay_state = torch.zeros((1, k, n_states, n_agents)).to(device)
-        self.delay_state[0, 0, :, :] = self.values
-        if prev_state is not None and k > 1:
-            self.delay_state[0, 1:k, :, :] = prev_state.delay_state[0, 0:k - 1, :, :]
 
 
 def train_ddpg(env, args, device):
