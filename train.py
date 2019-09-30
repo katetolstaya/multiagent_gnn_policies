@@ -11,6 +11,7 @@ from learner.gnn_cloning import train_cloning
 from learner.gnn_dagger import train_dagger
 from learner.gnn_baseline import train_baseline
 from learner.gnn_pac import train_dagger as train_pac_dagger
+from learner.gnn_pac_ddpg import train as train_gnn_pac_ddpg
 
 
 def run_experiment(args):
@@ -29,7 +30,7 @@ def run_experiment(args):
     torch.manual_seed(seed)
 
     # initialize params tuple
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(device)
 
     alg = args.get('alg').lower()
@@ -41,6 +42,8 @@ def run_experiment(args):
         stats = train_baseline(env, args)
     elif alg == 'pac':
         stats = train_pac_dagger(env, args, device)
+    elif alg == 'gnn_pac_ddpg':
+        stats = train_gnn_pac_ddpg(env, args, device)
     else:
         raise Exception('Invalid algorithm/mode name')
     return stats
