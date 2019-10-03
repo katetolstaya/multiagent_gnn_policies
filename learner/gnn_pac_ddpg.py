@@ -283,6 +283,7 @@ def train(env, args, device):
 
         done = False
         policy_loss_sum = 0
+        critic_loss_sum = 0
         while not done:
 
             action, message = learner.step(state)
@@ -318,6 +319,7 @@ def train(env, args, device):
                 unrolled_transitions = memory.sample(batch_size)
                 policy_loss, critic_loss = learner.gradient_step(unrolled_transitions)
                 policy_loss_sum += policy_loss
+                critic_loss_sum += critic_loss
                 updates += 1
 
         if i % test_interval == 0 and debug:
@@ -348,11 +350,12 @@ def train(env, args, device):
 
             if debug:
                 print(
-                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}".format(
+                    "Episode: {}, updates: {}, total numsteps: {}, reward: {}, policy loss: {}, critic loss: {}".format(
                         i, updates,
                         total_numsteps,
                         mean_reward,
-                        policy_loss_sum))
+                        policy_loss_sum,
+                        critic_loss_sum))
 
     test_rewards = []
     for _ in range(n_test_episodes):
