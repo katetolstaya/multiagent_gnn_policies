@@ -185,26 +185,27 @@ class PACDDPG(object):
         ################################################################################################################
         # Optimize Critic and Message networks
         self.critic_optim.zero_grad()  # Reset Gradient to Zero
-        self.message_optim.zero_grad()
+        # self.message_optim.zero_grad()
         critic_loss = F.mse_loss(self.critic(state_msg_batch, action_batch), expected_state_action_batch)
         critic_loss.backward(retain_graph=True)
 
         # TODO - gradient clipping only for message network, not actor or policy?
-        torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
         self.critic_optim.step()
-        self.message_optim.step()
+        # torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
+        # self.message_optim.step()
 
         ################################################################################################################
         # Optimize Actor network
         # TODO optimize message passing here or no?
 
         self.actor_optim.zero_grad()
-        # self.message_optim.zero_grad()
+        self.message_optim.zero_grad()
         policy_loss = -self.critic(state_msg_batch, self.actor(state_msg_batch)).mean()
         policy_loss.backward()
         self.actor_optim.step()
-        # torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
-        # self.message_optim.step()
+        
+        torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
+        self.message_optim.step()
 
         ################################################################################################################
         # Write parameters to Target networks.
