@@ -75,12 +75,14 @@ class PACDDPG(object):
         # Define Optimizers
         self.actor_optim = Adam(self.actor.parameters(), lr=args.getfloat('actor_lr'))
         self.critic_optim = Adam(self.critic.parameters(), lr=args.getfloat('critic_lr'))
-        self.message_optim = Adam(self.message.parameters(), lr=args.getfloat('message_lr'))
+        if self.msg_len > 0:
+            self.message_optim = Adam(self.message.parameters(), lr=args.getfloat('message_lr'))
 
         # Initialize Target Networks
         PACDDPG.hard_update(self.actor_target, self.actor)
         PACDDPG.hard_update(self.critic_target, self.critic)
-        PACDDPG.hard_update(self.message_target, self.message)
+        if self.msg_len > 0:
+            PACDDPG.hard_update(self.message_target, self.message)
 
         # Constants
         self.gamma = gamma
@@ -217,13 +219,15 @@ class PACDDPG(object):
         # TODO optimize message passing here or no?
 
         self.actor_optim.zero_grad()
-        self.message_optim.zero_grad()
+        if self.msg_len > 0:
+            self.message_optim.zero_grad()
         policy_loss = -self.critic(state_msg_batch, self.actor(state_msg_batch)).mean()
         policy_loss.backward()
         self.actor_optim.step()
 
         torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
-        self.message_optim.step()
+        if self.msg_len > 0:
+            self.message_optim.step()
 
         ################################################################################################################
         # Write parameters to Target networks.
@@ -356,7 +360,7 @@ def train(env, args, device):
                         message = message.cpu().numpy()
                     else:
                         message = None
-                        
+
                     next_state, reward, done, _ = env.step(action)
                     next_state = MultiAgentState(device, args, next_state, message)
                     ep_reward += np.sum(reward)
