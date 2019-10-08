@@ -103,15 +103,20 @@ class PACDDPG(object):
         action = action.permute(0, 1, 3, 2)
         action = action.view((self.n_agents, self.n_actions))
 
-        message = msg_val[:, :, -self.msg_len:, :]
-        message = message.permute(0, 1, 3, 2)
-        message = message.view((self.n_agents, self.msg_len))
+        if self.msg_len > 0:
+            message = msg_val[:, :, -self.msg_len:, :]
+            message = message.permute(0, 1, 3, 2)
+            message = message.view((self.n_agents, self.msg_len))
 
         self.actor.train()  # Switch back to Train mode.
         self.message.train()  # Switch back to Train mode.
 
         action = action.data
-        message = message.data
+
+        if self.msg_len > 0:
+            message = message.data
+        else:
+            message = None
 
         if action_noise is not None:  # Add noise if provided.
             action += torch.Tensor(action_noise.noise()).to(self.device)
@@ -135,11 +140,17 @@ class PACDDPG(object):
         for transitions in batch:
             value_batch.append(torch.cat(tuple([t.state.value for t in transitions]), 1))
             network_batch.append(torch.cat(tuple([t.state.network for t in transitions]), 1))
-            message_batch.append(torch.cat(tuple([t.state.message for t in transitions]), 1))
+            if self.msg_len > 0:
+                message_batch.append(torch.cat(tuple([t.state.message for t in transitions]), 1))
+            else:
+                message_batch = None
 
         value_batch = Variable(torch.cat(tuple(value_batch))).to(self.device)
         network_batch = Variable(torch.cat(tuple(network_batch))).to(self.device)
-        message_batch = Variable(torch.cat(tuple(message_batch))).to(self.device)
+        if self.msg_len > 0:
+            message_batch = Variable(torch.cat(tuple(message_batch))).to(self.device)
+        else:
+            message_batch = None
 
         state_msg_batch = self.message(value_batch, network_batch, message_batch)
 
@@ -155,11 +166,18 @@ class PACDDPG(object):
 
         next_value_batch = [transitions[-1].next_state.value for transitions in batch]
         next_network_batch = [transitions[-1].next_state.network for transitions in batch]
-        next_message_batch = [transitions[-1].next_state.message for transitions in batch]
+        if self.msg_len > 0:
+            next_message_batch = [transitions[-1].next_state.message for transitions in batch]
+        else:
+            next_message_batch = None
 
         next_value_batch = Variable(torch.cat(tuple(next_value_batch))).to(self.device)
         next_network_batch = Variable(torch.cat(tuple(next_network_batch))).to(self.device)
-        next_message_batch = Variable(torch.cat(tuple(next_message_batch))).to(self.device)
+
+        if self.msg_len > 0:
+            next_message_batch = Variable(torch.cat(tuple(next_message_batch))).to(self.device)
+        else:
+            next_message_batch = None
 
         next_state_msg_batch = self.message_target(next_value_batch, next_network_batch, next_message_batch)
 
@@ -289,7 +307,8 @@ def train(env, args, device):
 
             action, message = learner.step(state)
             action = action.cpu().numpy()
-            message = message.cpu().numpy()
+            if msg_len > 0:
+                message = message.cpu().numpy()
 
             next_state, reward, done, _ = env.step(action)
 
@@ -333,7 +352,11 @@ def train(env, args, device):
                 while not done:
                     action, message = learner.step(state)
                     action = action.cpu().numpy()
-                    message = message.cpu().numpy()
+                    if msg_len > 0:
+                        message = message.cpu().numpy()
+                    else:
+                        message = None
+                        
                     next_state, reward, done, _ = env.step(action)
                     next_state = MultiAgentState(device, args, next_state, message)
                     ep_reward += np.sum(reward)

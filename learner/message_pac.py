@@ -51,27 +51,30 @@ class Message(nn.Module):
 
         assert value.shape[2] == self.n_s
 
-        current_message = message[:, 0, :, :]
-        current_message = current_message.view((batch_size, 1, self.msg_len, n_agents))
+        if self.msg_len > 0:
+            current_message = message[:, 0, :, :]
+            current_message = current_message.view((batch_size, 1, self.msg_len, n_agents))
 
-        for l in range(unroll_len):
-            current_network = network[:, l, :, :].view((batch_size, 1, n_agents, n_agents))
-            passed_messages = torch.matmul(current_message, current_network)  # B, F, N
-            current_values = value[:, l, :, :].view((batch_size, 1, self.n_s, n_agents))  # B, F, N
-            x = torch.cat((current_values, passed_messages, current_message), 2)  # cat in features dim
+            for l in range(unroll_len):
+                current_network = network[:, l, :, :].view((batch_size, 1, n_agents, n_agents))
+                passed_messages = torch.matmul(current_message, current_network)  # B, F, N
+                current_values = value[:, l, :, :].view((batch_size, 1, self.n_s, n_agents))  # B, F, N
+                x = torch.cat((current_values, passed_messages, current_message), 2)  # cat in features dim
 
-            if l < unroll_len - 1:
-                x = x.permute(0, 2, 1, 3)  # now (B,F,K,N)
+                if l < unroll_len - 1:
+                    x = x.permute(0, 2, 1, 3)  # now (B,F,K,N)
 
-                for i in range(self.n_layers):
-                    # print(x.size())
-                    x = self.conv_layers[i](x)
-                    x = torch.tanh(x)
+                    for i in range(self.n_layers):
+                        # print(x.size())
+                        x = self.conv_layers[i](x)
+                        x = torch.tanh(x)
 
-                x = x.permute(0, 2, 1, 3)  # now (B,K,F,N)
-                current_message = x[:, :, -self.msg_len:, :].view((batch_size, 1, self.msg_len, n_agents))
-            else:
-                current_message = x.view((batch_size, 1, self.n_s + self.msg_len + self.msg_len, n_agents))
+                    x = x.permute(0, 2, 1, 3)  # now (B,K,F,N)
+                    current_message = x[:, :, -self.msg_len:, :].view((batch_size, 1, self.msg_len, n_agents))
+                else:
+                    current_message = x.view((batch_size, 1, self.n_s + self.msg_len + self.msg_len, n_agents))
+        else:
+            current_message = value[:, -1, :, :].view((batch_size, 1, self.n_s, n_agents))
 
         return current_message
 

@@ -29,8 +29,13 @@ def run_experiment(args):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
+    if 'device' in args:
+        device_string = args.get('device')
+    else:
+        device_string = "cuda:1"
+
     # initialize params tuple
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device(device_string if torch.cuda.is_available() else "cpu")
     print(device)
 
     alg = args.get('alg').lower()
