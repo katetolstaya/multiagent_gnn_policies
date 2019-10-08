@@ -18,20 +18,22 @@ class Message(nn.Module):
         self.msg_len = msg_len
         self.n_s = n_s
         self.msg_len = msg_len
-        self.layers = [n_s + msg_len + msg_len] + hidden_layers + [msg_len]
-        # self.layers = [n_s] + hidden_layers + [n_a + msg_len]
-        # self.layers = [n_s + msg_len] + hidden_layers + [n_a + msg_len]
-        self.n_layers = len(self.layers) - 1
 
-        self.conv_layers = []
+        if msg_len > 0:
+            self.layers = [n_s + msg_len + msg_len] + hidden_layers + [msg_len]
+            # self.layers = [n_s] + hidden_layers + [n_a + msg_len]
+            # self.layers = [n_s + msg_len] + hidden_layers + [n_a + msg_len]
+            self.n_layers = len(self.layers) - 1
 
-        for i in range(0, self.n_layers):
-            m = nn.Conv2d(in_channels=self.layers[i], out_channels=self.layers[i + 1], kernel_size=(1, 1),
-                          stride=(1, 1))
+            self.conv_layers = []
 
-            self.conv_layers.append(m)
+            for i in range(0, self.n_layers):
+                m = nn.Conv2d(in_channels=self.layers[i], out_channels=self.layers[i + 1], kernel_size=(1, 1),
+                              stride=(1, 1))
 
-        self.conv_layers = torch.nn.ModuleList(self.conv_layers)
+                self.conv_layers.append(m)
+
+            self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
     def forward(self, value, network, message):
         """
