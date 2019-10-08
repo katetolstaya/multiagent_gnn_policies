@@ -203,7 +203,7 @@ class PACDDPG(object):
         policy_loss = -self.critic(state_msg_batch, self.actor(state_msg_batch)).mean()
         policy_loss.backward()
         self.actor_optim.step()
-        
+
         torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
         self.message_optim.step()
 
@@ -336,7 +336,7 @@ def train(env, args, device):
                     message = message.cpu().numpy()
                     next_state, reward, done, _ = env.step(action)
                     next_state = MultiAgentState(device, args, next_state, message)
-                    ep_reward += reward
+                    ep_reward += np.sum(reward)
                     state = next_state
                     # env.render()
                 test_rewards.append(ep_reward)
