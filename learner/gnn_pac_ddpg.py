@@ -50,6 +50,10 @@ class PACDDPG(object):
         gamma = args.getfloat('gamma')
         tau = args.getfloat('tau')
 
+        self.critic_message_gradient = True
+        self.actor_message_gradient = False
+        self.unroll_target = True
+
         self.grad_clipping = args.getfloat('grad_clipping')
 
         self.n_agents = args.getint('n_agents')
@@ -157,21 +161,25 @@ class PACDDPG(object):
         state_msg_batch = self.message(value_batch, network_batch, message_batch)
 
         # TODO - should we unroll the target? Or just keep the latest message? improved stability?
-        # next_value_batch = []
-        # next_network_batch = []
-        # next_message_batch = []
-        #
-        # for transitions in batch:
-        #     next_value_batch.append(torch.cat(tuple([t.next_state.value for t in transitions]), 1))
-        #     next_network_batch.append(torch.cat(tuple([t.next_state.network for t in transitions]), 1))
-        #     next_message_batch.append(torch.cat(tuple([t.next_state.message for t in transitions]), 1))
+        if self.unroll_target:
+            next_value_batch = []
+            next_network_batch = []
+            next_message_batch = []
 
-        next_value_batch = [transitions[-1].next_state.value for transitions in batch]
-        next_network_batch = [transitions[-1].next_state.network for transitions in batch]
-        if self.msg_len > 0:
-            next_message_batch = [transitions[-1].next_state.message for transitions in batch]
+            for transitions in batch:
+                next_value_batch.append(torch.cat(tuple([t.next_state.value for t in transitions]), 1))
+                next_network_batch.append(torch.cat(tuple([t.next_state.network for t in transitions]), 1))
+                if self.msg_len > 0:
+                    next_message_batch.append(torch.cat(tuple([t.next_state.message for t in transitions]), 1))
+                else:
+                    next_message_batch = None
         else:
-            next_message_batch = None
+            next_value_batch = [transitions[-1].next_state.value for transitions in batch]
+            next_network_batch = [transitions[-1].next_state.network for transitions in batch]
+            if self.msg_len > 0:
+                next_message_batch = [transitions[-1].next_state.message for transitions in batch]
+            else:
+                next_message_batch = None
 
         next_value_batch = Variable(torch.cat(tuple(next_value_batch))).to(self.device)
         next_network_batch = Variable(torch.cat(tuple(next_network_batch))).to(self.device)
@@ -203,30 +211,34 @@ class PACDDPG(object):
         expected_state_action_batch = reward_batch + (self.gamma * mask_batch * next_action_value_batch)
 
         ################################################################################################################
-        # Optimize Critic and Message networks
+        # Optimize Critic network + Message network?
+
+        if self.msg_len > 0 and self.critic_message_gradient:
+            self.message_optim.zero_grad()
+
         self.critic_optim.zero_grad()  # Reset Gradient to Zero
-        # self.message_optim.zero_grad()
         critic_loss = F.mse_loss(self.critic(state_msg_batch, action_batch), expected_state_action_batch)
         critic_loss.backward(retain_graph=True)
-
-        # TODO - gradient clipping only for message network, not actor or policy?
         self.critic_optim.step()
-        # torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
-        # self.message_optim.step()
+
+        if self.msg_len > 0 and self.critic_message_gradient:
+            # clip the message gradient
+            torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
+            self.message_optim.step()
 
         ################################################################################################################
-        # Optimize Actor network
-        # TODO optimize message passing here or no?
+        # Optimize Actor network + Message network?
+
+        if self.msg_len > 0 and self.actor_message_gradient:
+            self.message_optim.zero_grad()
 
         self.actor_optim.zero_grad()
-        if self.msg_len > 0:
-            self.message_optim.zero_grad()
         policy_loss = -self.critic(state_msg_batch, self.actor(state_msg_batch)).mean()
         policy_loss.backward()
         self.actor_optim.step()
 
-        torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
-        if self.msg_len > 0:
+        if self.msg_len > 0 and self.actor_message_gradient:
+            torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
             self.message_optim.step()
 
         ################################################################################################################
