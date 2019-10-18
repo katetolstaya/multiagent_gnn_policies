@@ -19,7 +19,9 @@ def run_experiment(args):
     env_name = args.get('env')
     env = gym.make(env_name)
 
-    if isinstance(env.env, gym_flock.envs.FlockingRelativeEnv) or isinstance(env.env, gym_flock.envs.MappingLocalEnv):
+    if 'load_config' in args:
+        env.env.params_from_cfg(args)
+    elif isinstance(env.env, gym_flock.envs.FlockingRelativeEnv) or isinstance(env.env, gym_flock.envs.MappingLocalEnv):
         env.env.params_from_cfg(args)
 
     # use seed
