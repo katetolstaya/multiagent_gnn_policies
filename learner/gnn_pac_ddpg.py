@@ -130,7 +130,7 @@ class PACDDPG(object):
 
         return action, message
 
-    def gradient_step(self, batch):
+    def gradient_step(self, batch, update_target=False):
         """
         Take a gradient step given a batch of sampled transitions.
         :param batch: The batch of training samples, with each sample of length unroll transitions
@@ -243,6 +243,11 @@ class PACDDPG(object):
 
         ################################################################################################################
         # Write parameters to Target networks.
+        # if update_target:
+        #     PACDDPG.hard_update(self.actor_target, self.actor)
+        #     PACDDPG.hard_update(self.critic_target, self.critic)
+        #     PACDDPG.hard_update(self.message_target, self.message)
+
         PACDDPG.soft_update(self.actor_target, self.actor, self.tau)
         PACDDPG.soft_update(self.critic_target, self.critic, self.tau)
         PACDDPG.soft_update(self.message_target, self.message, self.tau)
@@ -353,7 +358,9 @@ def train(env, args, device):
 
         if memory.curr_size > batch_size:
             for _ in range(args.getint('updates_per_step')):
+                # update_target = i % test_interval != 0
                 unrolled_transitions = memory.sample(batch_size)
+                # policy_loss, critic_loss = learner.gradient_step(unrolled_transitions, update_target)
                 policy_loss, critic_loss = learner.gradient_step(unrolled_transitions)
                 policy_loss_sum += policy_loss
                 critic_loss_sum += critic_loss
