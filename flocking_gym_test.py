@@ -4,7 +4,7 @@ import configparser
 import numpy as np
 
 
-env_name = "MappingLocal-v0"
+env_name = "MappingVel-v0"
 # config_file = 'cfg/n_twoflocks.cfg'
 
 # env_name = "FlockingRelative-v0"
