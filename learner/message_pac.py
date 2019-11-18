@@ -114,6 +114,13 @@ class Actor(nn.Module):
 
         self.conv_layers = torch.nn.ModuleList(self.conv_layers)
 
+        self.layer_norms = []
+        for i in range(self.n_layers - 1):
+            m = nn.GroupNorm(self.layers[i + 1], self.layers[i + 1])
+            self.layer_norms.append(m)
+
+        self.layer_norms = torch.nn.ModuleList(self.layer_norms)
+
     def forward(self, value_msg):
         """
         The policy relies on delayed information from neighbors. During training, the full history for k time steps is
@@ -132,6 +139,8 @@ class Actor(nn.Module):
         for i in range(self.n_layers):
             # print(x.size())
             x = self.conv_layers[i](x)
+            if i < self.n_layers - 1:
+                x = self.layer_norms[i](x)
             x = torch.tanh(x)
 
         x = x.permute(0, 2, 1, 3)  # now (B,K,F,N)
@@ -161,6 +170,8 @@ class Critic(nn.Module):
         self.n_layers = len(self.layers) - 1
 
         self.conv_layers = []
+
+        self.use_layer_norm = False
 
         for i in range(0, self.n_layers):
             m = nn.Conv2d(in_channels=self.layers[i], out_channels=self.layers[i + 1], kernel_size=(1, 1),
