@@ -147,15 +147,20 @@ class Actor(nn.Module):
             x = torch.tanh(x)
 
         x = x.permute(0, 3, 1, 2)  # now (B,N,F,K)
-        probs = x.contiguous().view((batch_size * n_agents, self.n_a))
-        dist = Categorical(logits=probs)
+        logits = x.contiguous().view((batch_size * n_agents, self.n_a))
+        dist = Categorical(logits=logits)
 
         actions = dist.sample()
         actions = actions.view((batch_size, 1, 1, n_agents))
 
         if eval_actions is not None:
-            eval_actions = eval_actions.contiguous().view((batch_size * n_agents, 1))
-            log_probs = torch.diag(dist.log_prob(eval_actions))
+            # eval_actions = eval_actions.contiguous().view((batch_size * n_agents, 1))
+            # log_probs = torch.diag(dist.log_prob(eval_actions))
+            # log_probs = log_probs.view((batch_size, 1, 1, n_agents))
+
+            eval_actions = eval_actions.view((batch_size * n_agents, 1)).long()
+            all_agents = torch.arange(batch_size * n_agents).view((-1, 1))
+            log_probs = dist.probs[all_agents, eval_actions].log()
             log_probs = log_probs.view((batch_size, 1, 1, n_agents))
         else:
             log_probs = None

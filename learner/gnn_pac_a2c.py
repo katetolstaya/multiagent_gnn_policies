@@ -46,13 +46,8 @@ class PACDDPG(object):
 
         # Define Networks
         self.actor = Actor(n_s, n_a, msg_len, hidden_layers).to(self.device)
-        # self.actor_target = Actor(n_s, n_a, msg_len, hidden_layers).to(self.device)
-
         self.critic = Critic(n_s, msg_len, hidden_layers).to(self.device)
-        # self.critic_target = Critic(n_s, msg_len, hidden_layers).to(self.device)
-
         self.message = Message(n_s, msg_len, hidden_layers).to(self.device)
-        # self.message_target = Message(n_s, msg_len, hidden_layers).to(self.device)
 
         # Define Optimizers
         self.actor_optim = Adam(self.actor.parameters(), lr=args.getfloat('actor_lr'))
@@ -60,15 +55,10 @@ class PACDDPG(object):
         if self.msg_len > 0:
             self.message_optim = Adam(self.message.parameters(), lr=args.getfloat('message_lr'))
 
-        # # Initialize Target Networks
-        # PACDDPG.hard_update(self.actor_target, self.actor)
-        # PACDDPG.hard_update(self.critic_target, self.critic)
-        # if self.msg_len > 0:
-        #     PACDDPG.hard_update(self.message_target, self.message)
-
         # Constants
         self.gamma = gamma
         self.tau = tau
+        self.entropy_coeff = 1e-5
 
     def step(self, state, action_noise=None):
         """
@@ -184,7 +174,7 @@ class PACDDPG(object):
         expected_state_action_batch = reward_batch + (self.gamma * mask_batch * next_action_value_batch)
         advantages = expected_state_action_batch - self.critic(state_msg_batch)
 
-        _, action_log_probs, _ = self.actor(state_msg_batch, action_batch)  # .to(self.device)
+        _, action_log_probs, dist_entropy = self.actor(state_msg_batch, action_batch)  # .to(self.device)
 
         ################################################################################################################
         # Optimize Critic network + Message network?
@@ -209,14 +199,13 @@ class PACDDPG(object):
             self.message_optim.zero_grad()
 
         self.actor_optim.zero_grad()
-        policy_loss = -(advantages.detach() * action_log_probs).mean()
+        policy_loss = -(advantages.detach() * action_log_probs).mean() - self.entropy_coeff * dist_entropy
         policy_loss.backward()
         self.actor_optim.step()
 
         if self.msg_len > 0 and self.actor_message_gradient:
             torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
             self.message_optim.step()
-
 
         return policy_loss.item(), critic_loss.item()
 
