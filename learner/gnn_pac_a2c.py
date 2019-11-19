@@ -7,7 +7,7 @@ from torch.autograd import Variable
 from learner.state_with_message import MultiAgentState
 from learner.replay_buffer import ReplayBuffer
 from learner.replay_buffer import Transition
-from learner.message_pac import Actor, Critic, Message
+from learner.message_pac_disc import Actor, Critic, Message
 
 
 class PACDDPG(object):
@@ -68,10 +68,10 @@ class PACDDPG(object):
 
         # Define Networks
         self.actor = Actor(n_s, n_a, msg_len, hidden_layers).to(self.device)
-        self.actor_target = Actor(n_s, n_a, msg_len, hidden_layers).to(self.device)
+        # self.actor_target = Actor(n_s, n_a, msg_len, hidden_layers).to(self.device)
 
-        self.critic = Critic(n_s, n_a, msg_len, hidden_layers).to(self.device)
-        self.critic_target = Critic(n_s, n_a, msg_len, hidden_layers).to(self.device)
+        self.critic = Critic(n_s, msg_len, hidden_layers).to(self.device)
+        # self.critic_target = Critic(n_s, msg_len, hidden_layers).to(self.device)
 
         self.message = Message(n_s, msg_len, hidden_layers).to(self.device)
         self.message_target = Message(n_s, msg_len, hidden_layers).to(self.device)
@@ -82,11 +82,11 @@ class PACDDPG(object):
         if self.msg_len > 0:
             self.message_optim = Adam(self.message.parameters(), lr=args.getfloat('message_lr'))
 
-        # Initialize Target Networks
-        PACDDPG.hard_update(self.actor_target, self.actor)
-        PACDDPG.hard_update(self.critic_target, self.critic)
-        if self.msg_len > 0:
-            PACDDPG.hard_update(self.message_target, self.message)
+        # # Initialize Target Networks
+        # PACDDPG.hard_update(self.actor_target, self.actor)
+        # PACDDPG.hard_update(self.critic_target, self.critic)
+        # if self.msg_len > 0:
+        #     PACDDPG.hard_update(self.message_target, self.message)
 
         # Constants
         self.gamma = gamma
@@ -103,7 +103,7 @@ class PACDDPG(object):
         self.message.eval()  # Switch the actor network to Evaluation Mode.
 
         msg_val = self.message(state.value, state.network, state.message)
-        action = self.actor(msg_val)  # .to(self.device)
+        actions, log_probs, dist_entropy = self.actor(msg_val)  # .to(self.device)
 
         # mu is (B, 1, nA, N), need (N, nA)
         action = action.permute(0, 1, 3, 2)
@@ -189,7 +189,7 @@ class PACDDPG(object):
         else:
             next_message_batch = None
 
-        next_state_msg_batch = self.message_target(next_value_batch, next_network_batch, next_message_batch)
+        next_state_msg_batch = self.message(next_value_batch, next_network_batch, next_message_batch)
 
         ################################################################################################################
         # Get single step batch - use last message, state, action for evaluating the critic and actor
@@ -205,10 +205,10 @@ class PACDDPG(object):
         mask_batch = mask_batch.view(-1, 1, 1, 1)
 
         ################################################################################################################
-        # Evaluate target policy and critic
-        next_action_batch = self.actor_target(next_state_msg_batch)
-        next_action_value_batch = self.critic_target(next_state_msg_batch, next_action_batch)
+        # Evaluate policy and critic
+        next_action_value_batch = self.critic(next_state_msg_batch)
         expected_state_action_batch = reward_batch + (self.gamma * mask_batch * next_action_value_batch)
+        advantages = expected_state_action_batch - self.critic(state_msg_batch, action_batch)
 
         ################################################################################################################
         # Optimize Critic network + Message network?
@@ -217,7 +217,7 @@ class PACDDPG(object):
             self.message_optim.zero_grad()
 
         self.critic_optim.zero_grad()  # Reset Gradient to Zero
-        critic_loss = F.mse_loss(self.critic(state_msg_batch, action_batch), expected_state_action_batch)
+        critic_loss = advantages.pow(2).mean()
         critic_loss.backward(retain_graph=True)
         self.critic_optim.step()
 
@@ -232,8 +232,11 @@ class PACDDPG(object):
         if self.msg_len > 0 and self.actor_message_gradient:
             self.message_optim.zero_grad()
 
+
+        # TODO compute action_log_probs based on the actions taken - actually evaluate policy based on the state/msg 
+
         self.actor_optim.zero_grad()
-        policy_loss = -self.critic(state_msg_batch, self.actor(state_msg_batch)).mean()
+        policy_loss = -(advantages.detach() * action_log_probs).mean()
         policy_loss.backward()
         self.actor_optim.step()
 
