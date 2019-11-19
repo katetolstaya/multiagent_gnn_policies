@@ -9,31 +9,9 @@ from learner.replay_buffer import ReplayBuffer
 from learner.replay_buffer import Transition
 from learner.message_pac_disc import Actor, Critic, Message
 
+# Don't forget to cite https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail
 
 class PACDDPG(object):
-
-    @staticmethod
-    def hard_update(target, source):
-        """
-        Copy parameters from source to target.
-        :param target: Target network.
-        :param source: Source network.
-        :return:
-        """
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(param.data)
-
-    @staticmethod
-    def soft_update(target, source, tau):
-        """
-        Soft update parameters from source to target according to parameter Tau.
-        :param target: Target network.
-        :param source: Source network.
-        :param tau: Weight of the update.
-        :return: None
-        """
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(target_param.data * (1.0 - tau) + tau * param.data)
 
     def __init__(self, device, args):
         """
@@ -74,7 +52,7 @@ class PACDDPG(object):
         # self.critic_target = Critic(n_s, msg_len, hidden_layers).to(self.device)
 
         self.message = Message(n_s, msg_len, hidden_layers).to(self.device)
-        self.message_target = Message(n_s, msg_len, hidden_layers).to(self.device)
+        # self.message_target = Message(n_s, msg_len, hidden_layers).to(self.device)
 
         # Define Optimizers
         self.actor_optim = Adam(self.actor.parameters(), lr=args.getfloat('actor_lr'))
@@ -103,11 +81,11 @@ class PACDDPG(object):
         self.message.eval()  # Switch the actor network to Evaluation Mode.
 
         msg_val = self.message(state.value, state.network, state.message)
-        actions, log_probs, dist_entropy = self.actor(msg_val)  # .to(self.device)
+        action, _, _ = self.actor(msg_val)  # .to(self.device)
 
         # mu is (B, 1, nA, N), need (N, nA)
         action = action.permute(0, 1, 3, 2)
-        action = action.view((self.n_agents, self.n_actions))
+        action = action.view((self.n_agents, 1))
 
         if self.msg_len > 0:
             message = msg_val[:, :, -self.msg_len:, :]
@@ -124,13 +102,9 @@ class PACDDPG(object):
         else:
             message = None
 
-        if action_noise is not None:  # Add noise if provided.
-            action += torch.Tensor(action_noise.noise()).to(self.device)
-            action.clamp(-1, 1)
-
         return action, message
 
-    def gradient_step(self, batch, update_target=False):
+    def gradient_step(self, batch):
         """
         Take a gradient step given a batch of sampled transitions.
         :param batch: The batch of training samples, with each sample of length unroll transitions
@@ -208,7 +182,9 @@ class PACDDPG(object):
         # Evaluate policy and critic
         next_action_value_batch = self.critic(next_state_msg_batch)
         expected_state_action_batch = reward_batch + (self.gamma * mask_batch * next_action_value_batch)
-        advantages = expected_state_action_batch - self.critic(state_msg_batch, action_batch)
+        advantages = expected_state_action_batch - self.critic(state_msg_batch)
+
+        _, action_log_probs, _ = self.actor(state_msg_batch, action_batch)  # .to(self.device)
 
         ################################################################################################################
         # Optimize Critic network + Message network?
@@ -232,9 +208,6 @@ class PACDDPG(object):
         if self.msg_len > 0 and self.actor_message_gradient:
             self.message_optim.zero_grad()
 
-
-        # TODO compute action_log_probs based on the actions taken - actually evaluate policy based on the state/msg 
-
         self.actor_optim.zero_grad()
         policy_loss = -(advantages.detach() * action_log_probs).mean()
         policy_loss.backward()
@@ -244,16 +217,6 @@ class PACDDPG(object):
             torch.nn.utils.clip_grad_value_(self.message.parameters(), self.grad_clipping)
             self.message_optim.step()
 
-        ################################################################################################################
-        # Write parameters to Target networks.
-        # if update_target:
-        #     PACDDPG.hard_update(self.actor_target, self.actor)
-        #     PACDDPG.hard_update(self.critic_target, self.critic)
-        #     PACDDPG.hard_update(self.message_target, self.message)
-
-        PACDDPG.soft_update(self.actor_target, self.actor, self.tau)
-        PACDDPG.soft_update(self.critic_target, self.critic, self.tau)
-        PACDDPG.soft_update(self.message_target, self.message, self.tau)
 
         return policy_loss.item(), critic_loss.item()
 
@@ -349,7 +312,7 @@ def train(env, args, device):
             # action is (N, nA), need (B, 1, nA, N)
             action = torch.Tensor(action).to(device)
             action = action.transpose(1, 0)
-            action = action.reshape((1, 1, n_a, n_agents))
+            action = action.reshape((1, 1, 1, n_agents))
 
             transition = Transition(state, action, notdone, next_state, reward)
             unroll.append(transition)
