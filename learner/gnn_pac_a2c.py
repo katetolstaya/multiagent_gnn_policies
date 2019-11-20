@@ -28,8 +28,8 @@ class PACDDPG(object):
         gamma = args.getfloat('gamma')
         tau = args.getfloat('tau')
 
-        self.critic_message_gradient = False
-        self.actor_message_gradient = True
+        self.critic_message_gradient = True
+        self.actor_message_gradient = False
         self.unroll_target = True
 
         self.grad_clipping = args.getfloat('grad_clipping')
