@@ -20,8 +20,9 @@ env = gym.make(env_name)
 # config = configparser.ConfigParser()
 # config.read(config_file)
 # env.env.params_from_cfg(config[config.sections()[0]])
-
-while True:
+N = 1000
+total_reward = 0
+for _ in range(N):
     state = env.reset()
     episode_reward = 0
     done = False
@@ -33,8 +34,10 @@ while True:
         # print(reward)
         episode_reward += np.sum(reward)
         state = next_state
-        env.render()
-
+        # env.render()
+    total_reward += episode_reward
     print(episode_reward)
+print('total')
+print(total_reward / N)
 
 env.close()
