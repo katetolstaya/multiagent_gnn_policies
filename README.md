@@ -15,4 +15,14 @@
 ## Other code:
 - `python3 flocking_gym_test.py` provides test code for the Gym Flock environments
 
-
+## Citing the Project
+To cite this repository in publications:
+```shell
+@inproceedings{tolstaya2020learning,
+  title={Learning decentralized controllers for robot swarms with graph neural networks},
+  author={Tolstaya, Ekaterina and Gama, Fernando and Paulos, James and Pappas, George and Kumar, Vijay and Ribeiro, Alejandro},
+  booktitle={Conference on Robot Learning},
+  pages={671--682},
+  year={2020}
+}
+```
