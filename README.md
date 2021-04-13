@@ -1,4 +1,5 @@
 # Learning Multi-Agent Policies using GNNs
+
 ## Dependencies
 - Python 3
 - OpenAI Gym
@@ -6,7 +7,7 @@
 - [Gym-Flock](https://github.com/katetolstaya/gym-flock)
 
 ## Available algorithms:
-- Behavior Cloning as described in [ArXiv](https://arxiv.org/abs/1903.10527) `python3 train.py cfg/cloning.cfg`
+- Behavior Cloning `python3 train.py cfg/cloning.cfg`
 - DAGGER imitation learning `python3 train.py cfg/dagger.cfg`
 
 ## To test:
