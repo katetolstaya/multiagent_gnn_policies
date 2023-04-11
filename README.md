@@ -1,8 +1,10 @@
 # Learning Multi-Agent Policies using GNNs
 
 ## Dependencies
-- Python 3
-- OpenAI Gym
+- python==3.8
+- gym==0.11.0
+- numpy==1.20.0
+- matplotlib==2.2.2
 - PyTorch
 - [Gym-Flock](https://github.com/katetolstaya/gym-flock)
 
